@@ -91,7 +91,7 @@ MatrixSanityChecks <- function(structure.matrix, init.structure, none.at.start=N
   if (!is.matrix(structure.matrix)) stop("structure.matrix should be a matrix.")
   if (ncol(structure.matrix)!=nrow(structure.matrix)) stop("structure.matrix should have the same number of rows and columns.")
   if (!identical(colnames(structure.matrix),rownames(structure.matrix))) stop("structure.matrix rows and columns should have the same names.")
-  if (any(rowSums(structure.matrix) != 1)) stop("structure.matrix rows should sum up to 1.")
+  if (!isTRUE(all.equal(rep(1, ncol(structure.matrix)), rowSums(structure.matrix), check.attributes = FALSE))) stop("structure.matrix rows should sum up to 1.")
 
   if (is.null(none.at.start) && !(init.structure %in% rownames(structure.matrix))) stop("init.structure should be a state present in structure.matrix.")
 
