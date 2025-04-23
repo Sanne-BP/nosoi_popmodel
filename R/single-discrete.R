@@ -194,3 +194,4 @@ singleDiscrete <- function(length.sim,
   res$total.time <- pres.time
   return(res)
 }
+
