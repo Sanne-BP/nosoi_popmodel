@@ -1,4 +1,4 @@
-#This is the population size dynamics = PopModel that I have made. And this is sufficient for now and we will work with it to implement it into Nosoi!!! (see script 01)
+#This is the population size dynamics = PopModel that I have made. And this is sufficient for now and we will work with it to implement it into Nosoi!!! (see script 01). nContact was made dependent on the population size, so the bigger the population the higher the number of contacts and the smaller the population the lower the number of contacts. All these parameters can be adjusted!!
 
 library(devtools)
 library(nosoi)
