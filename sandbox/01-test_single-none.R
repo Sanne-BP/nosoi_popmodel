@@ -1,6 +1,7 @@
-#this script is for testing the updated/modified singleNone function, updated in the single-none.R script!
+#this script is for testing the updated/modified singleNone function, which is being updated/modified in the single-none.R script!
 
 library(nosoi)
+library(ggplot2)
 
 #defining parameters
 p_Exit_fct  <- function(t){return(0.08)}
@@ -37,14 +38,154 @@ test_result <- singleNone(length.sim = 100,
                           print.progress = FALSE)
 
 summary(test_result)
+test_result$pop_model
 
 
-
-
-
-
-
-library(ggplot2)
 
 # Example: visualize pop size dynamics
 plot(test_result$pop_model, type = "l", main = "Population Size Over Time")
+
+
+
+
+
+
+
+
+
+
+
+
+#------------------------------testing after the new modification
+library(nosoi)
+
+#birth rate
+birth.fct <- function(t, pop.size) { return(0.5 * pop.size) }
+
+#death rate
+death.fct <- function(t, pop.size) { return(0.5) }
+
+#pExit
+p_Exit_fct <- function(t, host.info, pop.size) {
+  rep(0.05, nrow(host.info))
+}
+
+#nContact
+n_contact_fct <- function(t, host.info, pop.size) {
+  base_rate <- 10
+  scaled_mean <- base_rate * (pop.size / 1000)
+  rep(abs(round(rnorm(nrow(host.info), scaled_mean, 1))), 1)
+}
+
+#pTrans
+p_Trans_fct <- function(t, host.info, pop.size, p_max, t_incub) {
+  p <- ifelse(t < t_incub, 0, p_max)
+  return(p)
+}
+
+# Parameters for pTrans
+param_pTrans <- list(p_max = function(x) { rbeta(x, 5, 2) },
+                     t_incub = function(x) { rnorm(x, 5, 1) })
+
+#Test the revised simulation
+sim <- singleNone(length.sim = 100,
+                  max.infected = 50000,
+                  init.individuals = 1,
+                  initial.population = 10000,
+                  birth.rate = birth.fct,
+                  param.birth.rate = list(),
+                  death.rate = death.fct,
+                  param.death.rate = list(),
+                  pExit = p_Exit_fct,
+                  param.pExit = list(),
+                  timeDep.pExit = FALSE,
+                  nContact = n_contact_fct,
+                  param.nContact = list(),
+                  timeDep.nContact = FALSE,
+                  pTrans = p_Trans_fct,
+                  param.pTrans = list(),
+                  timeDep.pTrans = FALSE,
+                  prefix.host = "TEST",
+                  print.progress = TRUE,
+                  print.step = 10)
+
+
+#does not work for now
+
+
+
+
+
+
+
+
+
+
+
+
+#--------------------------Edited nosoi_utilityFunctions.R so that nContact etc can accept extra parameters such as my population size!!! Lets see if this works.
+#birth rate
+birth.fct <- function(t, pop.size, ...) {
+  return(0.5 * pop.size) }
+
+#death rate
+death.fct <- function(t, pop.size, ...) {
+  return(0.5) } # or: return(0.01 * pop.size) if rate scales
+
+#pExit
+p_Exit_fct <- function(t, host.info, pop.size, ...) {
+  rep(0.05, nrow(host.info))
+}
+
+#nContact
+n_contact_fct <- function(t, host.info, pop.size, ...) {
+  base_rate <- 10
+  scaled_mean <- base_rate * (pop.size / 1000)
+  rep(abs(round(rnorm(nrow(host.info), scaled_mean, 1))), 1)
+}
+
+#pTrans
+p_Trans_fct <- function(t, host.info, pop.size, p_max, t_incub, ...) {
+  p <- ifelse(t < t_incub, 0, p_max)
+  return(p)
+}
+
+# Parameters for pTrans
+param_pTrans <- list(p_max = function(x) { rbeta(x, 5, 2) },
+                     t_incub = function(x) { rnorm(x, 5, 1) })
+
+#Test the revised simulation
+sim <- singleNone(length.sim = 100,
+                  max.infected = 50000,
+                  init.individuals = 1,
+                  initial.population = 10000,
+                  birth.rate = birth.fct,
+                  param.birth.rate = list(),
+                  death.rate = death.fct,
+                  param.death.rate = list(),
+                  pExit = p_Exit_fct,
+                  param.pExit = list(),
+                  timeDep.pExit = FALSE,
+                  nContact = n_contact_fct,
+                  param.nContact = list(),
+                  timeDep.nContact = FALSE,
+                  pTrans = p_Trans_fct,
+                  param.pTrans = list(),
+                  timeDep.pTrans = FALSE,
+                  prefix.host = "TEST",
+                  print.progress = TRUE,
+                  print.step = 10)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
