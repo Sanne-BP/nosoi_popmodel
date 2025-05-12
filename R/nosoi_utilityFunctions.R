@@ -36,20 +36,20 @@ parseFunction <- function(pFunc, param.pFunc, name, diff=FALSE, timeDep=FALSE, h
   }
 
   if (timeDep == FALSE){
-    pFunc_eval <- function(prestime, inf.time,...) {
+    pFunc_eval <- function(prestime, inf.time,..., extra.args = list()) {
       t = prestime - inf.time
-      x <- list(...)
-      do.call(pFunc, c(list(t = t), x))
+      x <- c(list(t=t), list(...), exra.args, param.pFunc)
+      do.call(pFunc, x)
     }
 
     pFunc_eval_args = c(formalArgs(pFunc_eval),formalArgs(pFunc)[-1])
   }
 
   if (timeDep == TRUE){
-    pFunc_eval <- function(prestime, inf.time,...) {
+    pFunc_eval <- function(prestime, inf.time,..., extra.args = list()) {
       t = prestime - inf.time
-      x <- list(...)
-      do.call(pFunc, c(list(t = t),list(prestime=prestime), x))
+      x <- c(list(t=t, prestime=prestime),list(...), extra.args, param.pFunc)
+      do.call(pFunc, x)
 
     }
     pFunc_eval_args = c(formalArgs(pFunc_eval),formalArgs(pFunc)[c(-1,-2)])
