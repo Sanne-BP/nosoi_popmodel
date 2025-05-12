@@ -15,6 +15,11 @@
 #' @param length.sim specifies the length (in unit of time) over which the simulation should be run.
 #' @param max.infected specifies the maximum number of hosts that can be infected in the simulation.
 #' @param init.individuals number of initially infected individuals.
+#' @param initial.population initial population size at the start of the simulation (t=0)
+#' @param birth.rate function or constant that gives the birth rate of the population
+#' @param param.birth.rate parameter names (list of functions) for the birth.rate
+#' @param death.rate function or constant that gives the death rate of the population
+#' @param param.death.rate parameter names (list of functions) for the death.rate
 #' @param nContact function that gives the number of potential transmission events per unit of time.
 #' @param param.nContact parameter names (list of functions) for param.nContact.
 #' @param timeDep.nContact is nContact dependent on the absolute time of the simulation? (TRUE/FALSE)
@@ -64,6 +69,9 @@
 singleNone <- function(length.sim,
                        max.infected,
                        init.individuals,
+                       initial.population,
+                       birth.rate, param.birth.rate,
+                       death.rate, param.death.rate,
                        pExit, param.pExit, timeDep.pExit=FALSE,
                        nContact, param.nContact, timeDep.nContact=FALSE,
                        pTrans, param.pTrans, timeDep.pTrans=FALSE,
@@ -85,6 +93,12 @@ singleNone <- function(length.sim,
   #Parsing pExit
   pExitParsed <- parseFunction(pExit, param.pExit, as.character(quote(pExit)),timeDep=timeDep.pExit)
 
+  #Parsing birth rate
+  birth.rateParsed <- parseFunction(birth.rate, param.birth.rate, as.character(quote(birth.rate)), timeDep=FALSE)
+
+  #Parsing death rate
+  death.rateParsed <- parseFunction(death.rate, param.death.rate, as.character(quote(death.rate)), timeDep=FALSE)
+
   #Parsing all parameters
   ParamHost <- paramConstructor(param.pExit, param.pMove=NA, param.nContact, param.pTrans, param.sdMove=NA)
 
@@ -102,32 +116,62 @@ singleNone <- function(length.sim,
                                prefix.host = prefix.host,
                                popStructure = "none"))
 
+  #Initialize dynamic population size vector
+  PopModel <- numeric(length.sim + 1)
+  PopModel[1] <- initial.population
+
   # Running the simulation ----------------------------------------
   message(" running ...")
 
   for (pres.time in 1:length.sim) {
 
-    #Step 0: Active hosts ----------------------------------------------------------
-    exiting.full <- getExitingMoving(res$host.info.A, pres.time, pExitParsed)
+    current.pop <- PopModel[pres.time]
+    ParamHost$pop.size <- current.pop
 
-    res$host.info.A$table.hosts[exiting.full, `:=` (out.time = pres.time,
-                                        active = FALSE)]
+    #Step 0: Active hosts ----------------------------------------------------------
+    exiting.full <- getExitingMoving(res$host.info.A, pres.time, pExitParsed,
+                                     extraArgs=list(pop.size=current.pop))
+
+    # Make sure it's logical
+    if (!is.logical(exiting.full)) {
+      exiting.full <- seq_len(nrow(res$host.info.A$table.hosts)) %in% exiting.full
+    }
+
+    epidemic_deaths <- sum(exiting.full & res$host.info.A$table.hosts$active)
+
+    res$host.info.A$table.hosts[exiting.full, `:=`(out.time = pres.time, active = FALSE)]
 
     if (!any(res$host.info.A$table.hosts[["active"]])) {break}
 
     #Step 1: Meeting & transmission ----------------------------------------------------
 
-    df.meetTransmit <- meetTransmit(res$host.info.A, pres.time, positions = NULL, nContactParsed, pTransParsed)
+    df.meetTransmit <- meetTransmit(res$host.info.A, pres.time, positions = NULL, nContactParsed,
+                                    pTransParsed, extraArgs = list(pop.size=current.pop))
 
     res$host.info.A <- writeInfected(df.meetTransmit, res$host.info.A, pres.time, ParamHost)
 
+    active_count <- sum(res$host.info.A$table.hosts$active)
+
+    # Step 2: Update population size with births/deaths
+    births <- rpois(1, do.call(birth.rateParsed, c(list(t=pres.time), param.birth.rate,
+                                              list(pop.size=current.pop))))
+    natural_deaths <- rbinom(1, active_count,
+                             do.call(death.rateParsed,
+                                     c(list(t=pres.time),
+                                       param.death.rate, list(pop.size=current.pop))))
+
+    PopModel[pres.time + 1] <- max(current.pop + births - natural_deaths - epidemic_deaths, 0)
+
+    # Step 3: (Optional) Progress output
     if (print.progress == TRUE) progressMessage(Host.count.A = res$host.info.A$N.infected, pres.time = pres.time, print.step = print.step, length.sim = length.sim, max.infected.A = max.infected)
     if (res$host.info.A$N.infected > max.infected) {break}
   }
 
   endMessage(Host.count.A = res$host.info.A$N.infected, pres.time = pres.time)
 
+  ### NEW: Save population model to result
   res$total.time <- pres.time
+  res$pop_model <- PopModel[1:(pres.time + 1)]
 
   return(res)
 }
