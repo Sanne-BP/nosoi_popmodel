@@ -100,10 +100,28 @@ singleNone <- function(length.sim,
   death.rateParsed <- parseFunction(death.rate, param.death.rate, as.character(quote(death.rate)), timeDep=FALSE)
 
   #Parsing all parameters
-  ParamHost <- paramConstructor(param.pExit, param.pMove=NA, param.nContact, param.pTrans, param.sdMove=NA)
+  ParamHost <- paramConstructor(param.pExit = param.pExit,
+                                param.pMove = NA,
+                                param.nContact = param.nContact,
+                                param.pTrans = param.pTrans,
+                                param.sdMove = NA)
 
   # Init
   message("Starting the simulation\nInitializing ...", appendLF = FALSE)
+
+  #Custom Wrappers for Pop-Dependent Functions----------------------
+
+  getExitingMoving_with_pop <- function(host.info, t, pExit.fun, pop.size) {
+    pExit.fun(t = t, host.info = host.info, pop.size = pop.size)
+  }
+
+  getContactNumber_with_pop <- function(t, host.info, nContact.fun, pop.size) {
+    nContact.fun(t = t, host.info = host.info, pop.size = pop.size)
+  }
+
+  getTransProbs_with_pop <- function(t, host.info, pTrans.fun, pop.size) {
+    pTrans.fun(t = t, host.info = host.info, pop.size = pop.size)
+  }
 
   #Creation of initial data ----------------------------------------------------------
 
@@ -129,8 +147,8 @@ singleNone <- function(length.sim,
     ParamHost$pop.size <- current.pop
 
     #Step 0: Active hosts ----------------------------------------------------------
-    exiting.full <- getExitingMoving(res$host.info.A, pres.time, pExitParsed,
-                                     extraArgs=list(pop.size=current.pop))
+    exiting.full <- getExitingMoving_with_pop(res$host.info.A, pres.time,
+                                              pExitParsed, current.pop)
 
     # Make sure it's logical
     if (!is.logical(exiting.full)) {
@@ -145,8 +163,11 @@ singleNone <- function(length.sim,
 
     #Step 1: Meeting & transmission ----------------------------------------------------
 
-    df.meetTransmit <- meetTransmit(res$host.info.A, pres.time, positions = NULL, nContactParsed,
-                                    pTransParsed, extraArgs = list(pop.size=current.pop))
+    nContact <- getContactNumber_with_pop(pres.time, res$host.info.A, nContactParsed, current.pop)
+    pTrans <- getTransProbs_with_pop(pres.time, res$host.info.A, pTransParsed, current.pop)
+
+    df.meetTransmit <- meetTransmit(res$host.info.A, pres.time,
+                                    positions = NULL, nContact, pTrans)
 
     res$host.info.A <- writeInfected(df.meetTransmit, res$host.info.A, pres.time, ParamHost)
 
