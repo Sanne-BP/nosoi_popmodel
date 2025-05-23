@@ -1,6 +1,9 @@
-#this script is for testing the updated/modified singleNone function, which is being updated/modified in the single-none.R script!
+#this script is for testing the updated/modified singleNone function
+#(which is being updated/modified in the single-none.R script!)
 
 library(nosoi)
+#downloading the forked nosoi version (only works for me):
+devtools::load_all("/Users/sanne/Library/Mobile Documents/com~apple~CloudDocs/Master Ecology & Conservation/Master Project 1/nosoi")
 library(ggplot2)
 
 #defining parameters
@@ -134,25 +137,47 @@ death.fct <- function(t, pop.size, ...) {
 
 #pExit
 p_Exit_fct <- function(t, host.info, pop.size, ...) {
+  if (!is.data.frame(host.info) || nrow(host.info) == 0) return(numeric(0))
   rep(0.05, nrow(host.info))
 }
 
 #nContact
 n_contact_fct <- function(t, host.info, pop.size, ...) {
+  if (!is.data.frame(host.info) || nrow(host.info) == 0) return(numeric(0))
+
   base_rate <- 10
   scaled_mean <- base_rate * (pop.size / 1000)
+
   rep(abs(round(rnorm(nrow(host.info), scaled_mean, 1))), 1)
 }
 
-#pTrans
+# Define parameter functions
+p_max_fct <- function(x) rbeta(x, 5, 2)
+t_incub_fct <- function(x) rnorm(x, 5, 1)
+
+# Bundle into param list
+param_pTrans <- list(
+  p_max = p_max_fct,
+  t_incub = t_incub_fct)
+
+# Define your transmission probability function
 p_Trans_fct <- function(t, host.info, pop.size, p_max, t_incub, ...) {
+  if (!is.data.frame(host.info) || nrow(host.info) == 0) {
+    return(numeric(0))
+  }
   p <- ifelse(t < t_incub, 0, p_max)
   return(p)
 }
 
-# Parameters for pTrans
-param_pTrans <- list(p_max = function(x) { rbeta(x, 5, 2) },
-                     t_incub = function(x) { rnorm(x, 5, 1) })
+#> parseFunction(p_Trans_fct, param_pTrans, "pTrans", timeDep = FALSE)
+#Error in FunctionSanityChecks(pFunc, name, param.pFunc, timeDep, diff,  :
+#                                Parameter name in param.pTrans should match the name used in #pTrans.
+
+#--> Solved this!
+
+# Test with parseFunction (this shouldn't error!)
+#parseFunction(p_Trans_fct, param_pTrans, "pTrans", timeDep = FALSE)
+#it should work now:
 
 #Test the revised simulation
 sim <- singleNone(length.sim = 100,
@@ -170,21 +195,23 @@ sim <- singleNone(length.sim = 100,
                   param.nContact = list(),
                   timeDep.nContact = FALSE,
                   pTrans = p_Trans_fct,
-                  param.pTrans = list(),
+                  param.pTrans = param_pTrans,
                   timeDep.pTrans = FALSE,
                   prefix.host = "TEST",
                   print.progress = TRUE,
                   print.step = 10)
 
+#error:
+#Starting the simulation
+#Initializing ... running ...
+#Error in if (is.null(host.info) || nrow(host.info) == 0) return(numeric(0)) :
+#  missing value where TRUE/FALSE needed
 
-
-
-
-
-
-
-
-
+#I have solved that error, but now I have:
+#Starting the simulation
+#Initializing ... running ...
+#Error in pasedFunction$vectArgs :
+#  $ operator is invalid for atomic vectors
 
 
 
