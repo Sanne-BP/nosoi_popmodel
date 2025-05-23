@@ -111,16 +111,16 @@ singleNone <- function(length.sim,
 
   #Custom Wrappers for Pop-Dependent Functions----------------------
 
-  getExitingMoving_with_pop <- function(host.info, t, pExit.fun, pop.size) {
-    pExit.fun(t = t, host.info = host.info, pop.size = pop.size)
+  getExitingMoving_with_pop <- function(host.info, t, pExit, pop.size) {
+    pExit(t = t, host.info = host.info, pop.size = pop.size)
   }
 
-  getContactNumber_with_pop <- function(t, host.info, nContact.fun, pop.size) {
-    nContact.fun(t = t, host.info = host.info, pop.size = pop.size)
+  getContactNumber_with_pop <- function(t, host.info, nContact, pop.size) {
+    nContact(t = t, host.info = host.info, pop.size = pop.size)
   }
 
-  getTransProbs_with_pop <- function(t, host.info, pTrans.fun, pop.size) {
-    pTrans.fun(t = t, host.info = host.info, pop.size = pop.size)
+  getTransProbs_with_pop <- function(t, host.info, pTrans, pop.size) {
+    pTrans(t = t, host.info = host.info, pop.size = pop.size)
   }
 
   #Creation of initial data ----------------------------------------------------------
