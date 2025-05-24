@@ -85,19 +85,22 @@ singleNone <- function(length.sim,
   CoreSanityChecks(length.sim, max.infected, init.individuals)
 
   #Parsing nContact
-  nContactParsed <- parseFunction(nContact, param.nContact, as.character(quote(nContact)),timeDep=timeDep.nContact)
+  nContactParsed <- parseFunction(nContact, param.nContact, name = "nContact",timeDep=timeDep.nContact)
 
   #Parsing pTrans
-  pTransParsed <- parseFunction(pTrans, param.pTrans, as.character(quote(pTrans)),timeDep=timeDep.pTrans)
+  pTransParsed <- parseFunction(pTrans, param.pTrans, name = "pTrans",timeDep=timeDep.pTrans)
 
   #Parsing pExit
-  pExitParsed <- parseFunction(pExit, param.pExit, as.character(quote(pExit)),timeDep=timeDep.pExit)
+  pExitParsed <- parseFunction(pExit, param.pExit, name = "pExit",timeDep=timeDep.pExit)
+
+  print("DEBUG: Parsed pExit:")
+  print(str(pExitParsed))
 
   #Parsing birth rate
-  birth.rateParsed <- parseFunction(birth.rate, param.birth.rate, as.character(quote(birth.rate)), timeDep=FALSE)
+  birth.rateParsed <- parseFunction(birth.rate, param.birth.rate, name = "birth.rate", timeDep=FALSE)
 
   #Parsing death rate
-  death.rateParsed <- parseFunction(death.rate, param.death.rate, as.character(quote(death.rate)), timeDep=FALSE)
+  death.rateParsed <- parseFunction(death.rate, param.death.rate, name = "death.rate", timeDep=FALSE)
 
   #Parsing all parameters
   ParamHost <- paramConstructor(param.pExit = param.pExit,
@@ -166,8 +169,12 @@ singleNone <- function(length.sim,
     nContact <- getContactNumber_with_pop(pres.time, res$host.info.A, nContactParsed, current.pop)
     pTrans <- getTransProbs_with_pop(pres.time, res$host.info.A, pTransParsed, current.pop)
 
-    df.meetTransmit <- meetTransmit(res$host.info.A, pres.time,
-                                    positions = NULL, nContact, pTrans)
+    parsedFunctions <- list(nContact = nContactParsed, pTrans = pTransParsed)
+
+    df.meetTransmit <- meetTransmit(res$host.info.A, pres.time, positions = NULL,
+                                    parsedFunctions = parsedFunctions)
+
+    print("DEBUG: Using nContactParsed and pTransParsed")
 
     res$host.info.A <- writeInfected(df.meetTransmit, res$host.info.A, pres.time, ParamHost)
 

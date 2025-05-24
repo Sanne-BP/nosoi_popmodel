@@ -38,8 +38,8 @@ parseFunction <- function(pFunc, param.pFunc, name, diff=FALSE, timeDep=FALSE, h
   if (timeDep == FALSE){
     pFunc_eval <- function(prestime, inf.time,..., extra.args = list()) {
       t = prestime - inf.time
-      x <- c(list(t=t), list(...), exra.args, param.pFunc)
-      do.call(pFunc, x)
+      args_list <- c(list(t = t), list(...), extra.args, param.pFunc)
+      do.call(pFunc, args_list)
     }
 
     pFunc_eval_args = c(formalArgs(pFunc_eval),formalArgs(pFunc)[-1])
@@ -160,18 +160,18 @@ paramConstructor <- function(param.pExit, param.pMove, param.nContact, param.pTr
 #'
 #' @param res an object of class \code{nosoiSimOne}.
 #' @param pres.time current time
-#' @param pasedFunction parsed exit/moving function
+#' @param parsedFunction parsed exit/moving function
 #' @param active.hosts a boolean vector of active hosts
 #'
 #' @return result vector
 #'
 #' @keywords internal
 ##
-applyFunctionToHosts <- function(res, pres.time, pasedFunction, active.hosts) {
+applyFunctionToHosts <- function(res, pres.time, parsedFunction, active.hosts) {
   return(res$table.hosts[active.hosts,
-                         pasedFunction$vect(prestime = pres.time, .SD),
+                         parsedFunction$vect(prestime = pres.time, .SD),
                          by = "hosts.ID",
-                         .SDcols = pasedFunction$vectArgs][["V1"]])
+                         .SDcols = parsedFunction$vectArgs][["V1"]])
 }
 
 #' @title Get Exiting or Moving individuals
@@ -181,19 +181,19 @@ applyFunctionToHosts <- function(res, pres.time, pasedFunction, active.hosts) {
 #'
 #' @param res an object of class \code{nosoiSimOne}.
 #' @param pres.time current time
-#' @param pasedFunction parsed exit/moving function
+#' @param parsedFunction parsed exit/moving function
 #'
 #' @return Boolean vector
 #'
 #' @keywords internal
 ##
-getExitingMoving <- function(res, pres.time, pasedFunction) {
+getExitingMoving <- function(res, pres.time, parsedFunction) {
 
   active.hosts <- res$table.hosts[["active"]] #active hosts (boolean vector)
 
   if (any(active.hosts)) {
 
-    p.exitMove.values <- applyFunctionToHosts(res, pres.time, pasedFunction, active.hosts)
+    p.exitMove.values <- applyFunctionToHosts(res, pres.time, pExitParsed, active.hosts)
 
     exitMove <- drawBernouilli(p.exitMove.values) #Draws K bernouillis with various probability (see function for more detail)
   }
