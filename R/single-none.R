@@ -27,39 +27,14 @@
 #' @param prefix.host character(s) to be used as a prefix for the hosts identification number.
 #' @param print.progress if TRUE, displays a progress bar (current time/length.sim).
 #' @param print.step print.progress is TRUE, step with which the progress message will be printed.
+#' @param initial.population initial size of the host population.
+#' @param birth.rate birth rate per individual per time step.
+#' @param death.rate death rate per individual per time step.
 #'
 #' @return An object of class \code{\link{nosoiSim}}, containing all results of the simulation.
 #'
 #' @seealso For simulations with a discrete structured host population, see \code{\link{singleDiscrete}}. For simulations with a structured population in continuous space, \code{\link{singleContinuous}}
 #'
-#' @examples
-#' \donttest{
-#'t_incub_fct <- function(x){rnorm(x,mean = 5,sd=1)}
-#'p_max_fct <- function(x){rbeta(x,shape1 = 5,shape2=2)}
-#'p_Exit_fct  <- function(t){return(0.08)}
-#'
-#'proba <- function(t,p_max,t_incub){
-#'  if(t <= t_incub){p=0}
-#'  if(t >= t_incub){p=p_max}
-#'  return(p)
-#'}
-#'
-#'time_contact <- function(t){round(rnorm(1, 3, 1), 0)}
-#'
-#'test.nosoi <- nosoiSim(type="single", popStructure="none",
-#'                       length=40,
-#'                       max.infected=100,
-#'                       init.individuals=1,
-#'                       nContact=time_contact,
-#'                       param.nContact=NA,
-#'                       pTrans = proba,
-#'                       param.pTrans = list(p_max=p_max_fct,
-#'                                           t_incub=t_incub_fct),
-#'                       pExit=p_Exit_fct,
-#'                       param.pExit=NA)
-#'
-#'test.nosoi
-#'}
 #' @export singleNone
 singleNone <- function(length.sim,
                        max.infected,
@@ -74,28 +49,21 @@ singleNone <- function(length.sim,
                        birth.rate=0.5,
                        death.rate=0.5){
 
-  #Sanity check---------------------------------------------------------------------------------------------------------------------------
-  #This section checks if the arguments of the function are in a correct format for the function to run properly
-
+  # Sanity check
   CoreSanityChecks(length.sim, max.infected, init.individuals)
 
-  #Parsing nContact
-  nContactParsed <- parseFunction(nContact, param.nContact, as.character(quote(nContact)),timeDep=timeDep.nContact)
+  # Parsing functions
+  nContactParsed <- parseFunction(nContact, param.nContact, as.character(quote(nContact)), timeDep=timeDep.nContact)
+  pTransParsed <- parseFunction(pTrans, param.pTrans, as.character(quote(pTrans)), timeDep=timeDep.pTrans)
+  pExitParsed <- parseFunction(pExit, param.pExit, as.character(quote(pExit)), timeDep=timeDep.pExit)
 
-  #Parsing pTrans
-  pTransParsed <- parseFunction(pTrans, param.pTrans, as.character(quote(pTrans)),timeDep=timeDep.pTrans)
-
-  #Parsing pExit
-  pExitParsed <- parseFunction(pExit, param.pExit, as.character(quote(pExit)),timeDep=timeDep.pExit)
-
-  #Parsing all parameters
+  # Parsing parameters for hosts
   ParamHost <- paramConstructor(param.pExit, param.pMove=NA, param.nContact, param.pTrans, param.sdMove=NA)
 
-  # Init
+  # Initialization message
   message("Starting the simulation\nInitializing ...", appendLF = FALSE)
 
-  #Creation of initial data ----------------------------------------------------------
-
+  # Initial data setup
   res <- nosoiSimConstructor(total.time = 1,
                              type = "single",
                              pop.A = nosoiSimOneConstructor(
@@ -105,46 +73,63 @@ singleNone <- function(length.sim,
                                prefix.host = prefix.host,
                                popStructure = "none"))
 
-  # -- simulate population size over time --
-  pop_size <- numeric(length.sim + 1)
-  pop_size[1] <- initial.population
+  # Initialize population size vector
+  PopModel <- numeric(length.sim + 1)
+  PopModel[1] <- initial.population
 
-  for (t in 2:(length.sim + 1)) {
-    births <- rpois(1, birth.rate * pop_size[t - 1])
-    deaths <- rbinom(1, pop_size[t - 1], death.rate)
-    pop_size[t] <- max(0, pop_size[t - 1] + births - deaths)
-  }
-
-  # Running the simulation ----------------------------------------
+  # Run simulation
   message(" running ...")
 
   for (pres.time in 1:length.sim) {
 
-    #Optional: store current population size in output (not required but useful)
-    current_population <- pop_size[pres.time]
+    # Population dynamics: births and natural deaths
+    births <- rpois(1, birth.rate * PopModel[pres.time])
+    deaths <- rbinom(1, PopModel[pres.time], death.rate)
 
-    #Step 0: Active hosts ----------------------------------------------------------
+    # Identify hosts exiting due to epidemic (pExit)
     exiting.full <- getExitingMoving(res$host.info.A, pres.time, pExitParsed)
 
+    # Fix for logical indexing bug
+    if (!is.logical(exiting.full)) {
+      exiting.full <- seq_len(nrow(res$host.info.A$table.hosts)) %in% exiting.full
+    }
+
+    # Mark hosts that exit due to epidemic
     res$host.info.A$table.hosts[exiting.full, `:=` (out.time = pres.time,
                                                     active = FALSE)]
 
+    # Epidemic deaths count
+    epidemic_deaths <- sum(exiting.full)
+
+    # Update population size with births and subtract deaths + epidemic deaths
+    PopModel[pres.time + 1] <- max(0, PopModel[pres.time] + births - deaths - epidemic_deaths)
+
+    # Stop if no active hosts left
     if (!any(res$host.info.A$table.hosts[["active"]])) {break}
 
-    #Step 1: Meeting & transmission ----------------------------------------------------
-
+    # Step 1: Contact and transmission
     df.meetTransmit <- meetTransmit(res$host.info.A, pres.time, positions = NULL, nContactParsed, pTransParsed)
 
     res$host.info.A <- writeInfected(df.meetTransmit, res$host.info.A, pres.time, ParamHost)
 
-    if (print.progress == TRUE) progressMessage(Host.count.A = res$host.info.A$N.infected, pres.time = pres.time, print.step = print.step, length.sim = length.sim, max.infected.A = max.infected)
+    # Progress printout
+    if (print.progress && (pres.time %% print.step == 0)) {
+      progressMessage(Host.count.A = res$host.info.A$N.infected,
+                      pres.time = pres.time,
+                      print.step = print.step,
+                      length.sim = length.sim,
+                      max.infected.A = max.infected)
+    }
+
+    # Stop if max infected exceeded
     if (res$host.info.A$N.infected > max.infected) {break}
   }
 
+  # End message and finalizing
   endMessage(Host.count.A = res$host.info.A$N.infected, pres.time = pres.time)
 
   res$total.time <- pres.time
-  res$popSize <- pop_size   # store simulated population size in output
+  res$pop_model <- PopModel[1:(pres.time + 1)]
 
   return(res)
 }
