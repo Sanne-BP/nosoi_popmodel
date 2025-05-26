@@ -6,6 +6,10 @@ devtools::load_all("/Users/sanne/Library/Mobile Documents/com~apple~CloudDocs/Ma
 library(ggplot2)
 
 
+
+
+
+#--------------------------this does not work anymoreee
 #defining parameters
 p_Exit_fct  <- function(t){return(0.08)}
 
@@ -50,3 +54,56 @@ plot(test_result$pop_model, type = "l", main = "Population Size Over Time")
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+#-------------------------------testing whether we now have the working singleNone file!!!
+
+# Set parameters (if not already)
+p_max_fct <- function(ID) {
+  return(0.3)  # You can still return a constant, but accept an argument
+}
+
+t_incub_fct <- function(ID) {
+  return(3)
+}
+
+# Transmission probability function
+proba <- function(t, p_max, t_incub) {
+  ifelse(t >= t_incub, p_max, 0)
+}
+
+# Exit probability function (constant exit)
+p_Exit_fct <- function(t) { 0.1 }
+
+# Contact function (constant number of contacts)
+time_contact <- function(t) { 2 }
+
+# Run the simulation
+test.popdyn <- singleNone(
+  length.sim = 20,
+  max.infected = 50,
+  init.individuals = 2,
+  nContact = time_contact,
+  param.nContact = NA,
+  timeDep.nContact = FALSE,
+  pTrans = proba,
+  param.pTrans = list(p_max = p_max_fct, t_incub = t_incub_fct),
+  timeDep.pTrans = FALSE,
+  pExit = p_Exit_fct,
+  param.pExit = NA,
+  timeDep.pExit = FALSE,
+  print.progress = TRUE
+)
+
+#THIS WORKSSS YHAS
