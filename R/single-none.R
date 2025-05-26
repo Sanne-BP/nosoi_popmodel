@@ -69,7 +69,10 @@ singleNone <- function(length.sim,
                        pTrans, param.pTrans, timeDep.pTrans=FALSE,
                        prefix.host="H",
                        print.progress=TRUE,
-                       print.step=10){
+                       print.step=10,
+                       initial.population=10000,
+                       birth.rate=0.5,
+                       death.rate=0.5){
 
   #Sanity check---------------------------------------------------------------------------------------------------------------------------
   #This section checks if the arguments of the function are in a correct format for the function to run properly
@@ -102,16 +105,29 @@ singleNone <- function(length.sim,
                                prefix.host = prefix.host,
                                popStructure = "none"))
 
+  # -- simulate population size over time --
+  pop_size <- numeric(length.sim + 1)
+  pop_size[1] <- initial.population
+
+  for (t in 2:(length.sim + 1)) {
+    births <- rpois(1, birth.rate * pop_size[t - 1])
+    deaths <- rbinom(1, pop_size[t - 1], death.rate)
+    pop_size[t] <- max(0, pop_size[t - 1] + births - deaths)
+  }
+
   # Running the simulation ----------------------------------------
   message(" running ...")
 
   for (pres.time in 1:length.sim) {
 
+    #Optional: store current population size in output (not required but useful)
+    current_population <- pop_size[pres.time]
+
     #Step 0: Active hosts ----------------------------------------------------------
     exiting.full <- getExitingMoving(res$host.info.A, pres.time, pExitParsed)
 
     res$host.info.A$table.hosts[exiting.full, `:=` (out.time = pres.time,
-                                        active = FALSE)]
+                                                    active = FALSE)]
 
     if (!any(res$host.info.A$table.hosts[["active"]])) {break}
 
@@ -128,6 +144,7 @@ singleNone <- function(length.sim,
   endMessage(Host.count.A = res$host.info.A$N.infected, pres.time = pres.time)
 
   res$total.time <- pres.time
+  res$popSize <- pop_size   # store simulated population size in output
 
   return(res)
 }
