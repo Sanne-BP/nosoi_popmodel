@@ -9,7 +9,7 @@ library(ggplot2)
 
 
 
-#--------------------------this does not work anymoreee
+#--------------------------this does not work anymoreee!!
 #defining parameters
 p_Exit_fct  <- function(t){return(0.08)}
 
@@ -200,7 +200,117 @@ ggplot(pop_df, aes(x = time)) +
 
 
 
+
+
+
+
+
+
+
+
+
 #Can we alter the parameters?------------------------------------------------------------
+#yes we can, these parameters are now more representing how the "old default" parameters are set
+p_Exit_fct <- function(t) {return(0.08)}
+
+n_contact_fct <- function(t) {abs(round(rnorm(1, mean = 0.5, sd = 1), 0))}
+
+p_Trans_fct <- function(t, p_max, t_incub) {
+  if (t < t_incub) return(0)
+  else return(p_max)}
+
+t_incub_fct <- function(x) {rnorm(x, mean = 7, sd = 1)}
+p_max_fct <- function(x) {rbeta(x, shape1 = 5, shape2 = 2)}
+
+param_pTrans <- list(p_max = p_max_fct, t_incub = t_incub_fct)
+
+
+sim <- singleNone(length.sim = 100,
+                  max.infected = 10000,
+                  init.individuals = 1,
+                  pExit = p_Exit_fct,
+                  param.pExit = NA,
+                  timeDep.pExit = FALSE,
+                  nContact = n_contact_fct,
+                  param.nContact = NA,
+                  timeDep.nContact = FALSE,
+                  pTrans = p_Trans_fct,
+                  param.pTrans = param_pTrans,
+                  timeDep.pTrans = FALSE,
+                  print.progress = TRUE,
+                  initial.population = 10000,
+                  birth.rate = 0.5,
+                  death.rate = 0.5)
+
+#Starting the simulation
+#Initializing ... running ...
+#Time: 10 (10% of maximum length). Hosts count: 4 (0% of maximum infected hosts).
+#Time: 20 (20% of maximum length). Hosts count: 9 (0% of maximum infected hosts).
+#Time: 30 (30% of maximum length). Hosts count: 24 (0% of maximum infected hosts).
+#Time: 40 (40% of maximum length). Hosts count: 83 (1% of maximum infected hosts).
+#Time: 50 (50% of maximum length). Hosts count: 266 (3% of maximum infected hosts).
+#Time: 60 (60% of maximum length). Hosts count: 678 (7% of maximum infected hosts).
+#Time: 70 (70% of maximum length). Hosts count: 1799 (18% of maximum infected hosts).
+#Time: 80 (80% of maximum length). Hosts count: 4571 (46% of maximum infected hosts).
+#done.
+#The simulation has run for 89 units of time and a total of 10821 hosts have been infected.
+
+infected_over_time <- sapply(0:sim$total.time, function(t) {
+  sum(sim$host.info.A$table.hosts$inf.time <= t)})
+
+pop_df <- data.frame(time = 0:sim$total.time,
+                     population_size = sim$pop_model[1:(sim$total.time + 1)],
+                     infected = infected_over_time)
+
+ggplot(pop_df, aes(x = time)) +
+  geom_line(aes(y = population_size, color = "Population Size"), size = 1) +
+  geom_line(aes(y = infected, color = "Infected Individuals"), size = 1) +
+  scale_color_manual(values = c("Population Size" = "blue",
+                                "Infected Individuals" = "red")) +
+  labs(title = "Population Size and Infected Individuals Over Time",
+       x = "Time",
+       y = "Count",
+       color = "Legend") +
+  theme_minimal()
+
+
+
+
+
+
+
+
+#---------test with stochastic replicates:
+n_replicates <- 50
+
+results <- replicate(n_replicates, {
+  sim <- singleNone(length.sim = 100,
+                    max.infected = 10000,
+                    init.individuals = 1,
+                    pExit = p_Exit_fct,
+                    param.pExit = NA,
+                    timeDep.pExit = FALSE,
+                    nContact = n_contact_fct,
+                    param.nContact = NA,
+                    timeDep.nContact = FALSE,
+                    pTrans = p_Trans_fct,
+                    param.pTrans = list(p_max = p_max_fct, t_incub = t_incub_fct),
+                    timeDep.pTrans = FALSE,
+                    print.progress = FALSE,
+                    initial.population = 10000,
+                    birth.rate = 0.5,
+                    death.rate = 0.5)
+  max(sapply(0:sim$total.time, function(t) {
+    sum(sim$host.info.A$table.hosts$inf.time <= t)
+  }))})
+
+barplot(table(results),
+        main = "Counts of Max Infected per Simulation",
+        xlab = "Max Infected",
+        ylab = "Number of Simulations")
+
+#so for these parameters: 28 out of 50 runs ended with a max infected of 1 -> these outbreaks never really took off. A few runs had small outbreaks. The rest (~21 runs) had large outbreaks with max infected ranging from 4000 to 11000.
+#this is typical for these models as often many simulations die out early due to chance, while others explode into full outbreaks.
 
 
 
@@ -211,6 +321,47 @@ ggplot(pop_df, aes(x = time)) +
 
 
 
+
+
+#--------------------------lets make nContact dependent on popsize again!!
+n_contact_fct <- function(t) {
+  current_pop <- pop_size[min(t + 1, length(pop_size))]
+
+  base_rate <- 10  # baseline contacts per 1000 individuals
+  scaled_mean <- base_rate * (current_pop / 1000)
+
+  n_contacts_i <- abs(round(rnorm(1, mean = scaled_mean, sd = 1)))
+
+  return(n_contacts_i)
+}
+
+p_Exit_fct <- function(t) {return(0.08)}
+
+p_Trans_fct <- function(t, p_max, t_incub) {
+  if (t < t_incub) return(0)
+  else return(p_max)}
+
+t_incub_fct <- function(x) {rnorm(x, mean = 7, sd = 1)}
+p_max_fct <- function(x) {rbeta(x, shape1 = 5, shape2 = 2)}
+
+param_pTrans <- list(p_max = p_max_fct, t_incub = t_incub_fct)
+
+sim <- singleNone(length.sim = 100,
+                  max.infected = 10000,
+                  init.individuals = 1,
+                  pExit = p_Exit_fct,
+                  param.pExit = NA,
+                  timeDep.pExit = FALSE,
+                  nContact = n_contact_fct,
+                  param.nContact = NA,
+                  timeDep.nContact = FALSE,
+                  pTrans = p_Trans_fct,
+                  param.pTrans = param_pTrans,
+                  timeDep.pTrans = FALSE,
+                  print.progress = TRUE,
+                  initial.population = 10000,
+                  birth.rate = 0.5,
+                  death.rate = 0.5)
 
 
 
