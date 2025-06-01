@@ -323,7 +323,57 @@ barplot(table(results),
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+#okay so for now this does not work, as I would have to modify the internal core for this again, and I tried for 3+ hours now and it does not work, so let's first skip this again!!
 #--------------------------lets make nContact dependent on popsize again!!
+n_contact_fct <- function(t, pop_size) {
+  base_rate <- 10  # baseline contacts per 1000 individuals
+  scaled_mean <- base_rate * (pop_size / 1000)
+  n_contacts_i <- abs(round(rnorm(1, mean = scaled_mean, sd = 1)))
+  return(n_contacts_i)
+}
+
+p_Exit_fct <- function(t) {return(0.08)}
+
+p_Trans_fct <- function(t, p_max, t_incub) {
+  if (t < t_incub) return(0)
+  else return(p_max)}
+
+t_incub_fct <- function(x) {rnorm(x, mean = 7, sd = 1)}
+p_max_fct <- function(x) {rbeta(x, shape1 = 5, shape2 = 2)}
+
+param_pTrans <- list(p_max = p_max_fct, t_incub = t_incub_fct)
+
+sim <- singleNone(length.sim = 100,
+                  max.infected = 10000,
+                  init.individuals = 1,
+                  pExit = p_Exit_fct,
+                  param.pExit = NA,
+                  timeDep.pExit = FALSE,
+                  nContact = n_contact_fct,
+                  param.nContact = param.nContact,
+                  timeDep.nContact = FALSE,
+                  pTrans = p_Trans_fct,
+                  param.pTrans = param_pTrans,
+                  timeDep.pTrans = FALSE,
+                  print.progress = TRUE,
+                  initial.population = 10000,
+                  birth.rate = 0.5,
+                  death.rate = 0.5)
+
+
+#####
+#--------------------------lets make nContact dependent on popsize again!!Add commentMore actions
 n_contact_fct <- function(t) {
   current_pop <- pop_size[min(t + 1, length(pop_size))]
 
@@ -362,9 +412,5 @@ sim <- singleNone(length.sim = 100,
                   initial.population = 10000,
                   birth.rate = 0.5,
                   death.rate = 0.5)
-
-
-
-
 
 
