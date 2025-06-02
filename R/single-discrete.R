@@ -129,12 +129,16 @@ singleDiscrete <- function(length.sim,
                                    prefix.host = prefix.host.B,
                                    popStructure = "discrete"))
 
-  res[["table.state"]] <- data.table::data.table(
+  res$table.state <- data.table::data.table(
     time = integer(),
     population.A = numeric(),
     infected.A = integer(),
     population.B = numeric(),
-    infected.B = integer())
+    infected.B = integer()
+  )
+
+  # Explicitly mark as a data.table
+  data.table::setDT(res$table.state)
 
   print(str(res$table.state))
 
@@ -143,6 +147,9 @@ singleDiscrete <- function(length.sim,
   PopModel.B <- numeric(length.sim + 1)
   PopModel.A[1] <- initial.population.A
   PopModel.B[1] <- initial.population.B
+
+  stopifnot("table.state exists" = !is.null(res$table.state))
+  stopifnot("table.state is a data.table" = "data.table" %in% class(res$table.state))
 
   message(" running ...")
 
@@ -185,31 +192,40 @@ singleDiscrete <- function(length.sim,
     res$host.info.A <- writeInfected(df.meetTransmit.A, res$host.info.A, pres.time, ParamHost.A)
     res$host.info.B <- writeInfected(df.meetTransmit.B, res$host.info.B, pres.time, ParamHost.B)
 
-    # Construct temporary state table for this time step (new)
+
+    # Construct temporary state table for this time step
     table.state.temp <- data.table::data.table(
       time = pres.time,
       population.A = PopModel.A[pres.time + 1],
       infected.A = sum(res$host.info.A$table.hosts$active),
       population.B = PopModel.B[pres.time + 1],
-      infected.B = sum(res$host.info.B$table.hosts$active))
-    print(class(table.state.temp))
+      infected.B = sum(res$host.info.B$table.hosts$active)
+    )
 
+    # SAFETY CHECK before appending
     if (!data.table::is.data.table(res$table.state)) {
+      warning("res$table.state became invalid, reinitializing.")
       res$table.state <- data.table::data.table(
         time = integer(),
         population.A = numeric(),
         infected.A = integer(),
         population.B = numeric(),
         infected.B = integer()
-      )}
+      )
+    }
 
-    # Append to full state table (new)
-    res$table.state <- data.table::rbindlist(
-      list(res$table.state, table.state.temp),
-      use.names = TRUE, fill = TRUE)
+    # Append to full state table
+    cat("DEBUG: before appending\n")
     print(class(res$table.state))
+    print(res$table.state)
     print(class(table.state.temp))
-    print(str(res$table.state))
+    print(table.state.temp)
+
+
+    res$table.state <- data.table::rbindlist(
+      list(res$table.state, table.state.temp), use.names = TRUE, fill = TRUE
+    )
+
 
     # Progress update
     if (print.progress && (pres.time %% print.step == 0)) {
