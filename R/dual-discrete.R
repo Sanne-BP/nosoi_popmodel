@@ -142,185 +142,149 @@
 #'}
 #'
 #' @export
-dualDiscrete <- function(length.sim = 10,
-                         max.infected.A = 100,
-                         max.infected.B = 100,
-                         init.individuals.A = 1,
-                         init.individuals.B = 1,
-                         init.structure.A = NA,
-                         init.structure.B = NA,
-                         structure.matrix.A,
-                         structure.matrix.B,
-                         pExit.A,
-                         param.pExit.A = NA,
-                         pMove.A,
-                         param.pMove.A = NA,
-                         timeDep.pMove.A = FALSE,
-                         diff.pMove.A = FALSE,
-                         hostCount.pMove.A = FALSE,
-                         diff.pExit.A = FALSE,
-                         hostCount.pExit.A = FALSE,
-                         nContact.A,
-                         param.nContact.A = NA,
-                         timeDep.nContact.A = FALSE,
-                         diff.nContact.A = FALSE,
-                         hostCount.nContact.A = FALSE,
-                         pTrans.A,
-                         param.pTrans.A = NA,
-                         timeDep.pTrans.A = FALSE,
-                         diff.pTrans.A = FALSE,
-                         hostCount.pTrans.A = FALSE,
-                         pExit.B,
-                         param.pExit.B = NA,
-                         pMove.B,
-                         param.pMove.B = NA,
-                         timeDep.pMove.B = FALSE,
-                         diff.pMove.B = FALSE,
-                         hostCount.pMove.B = FALSE,
-                         diff.pExit.B = FALSE,
-                         hostCount.pExit.B = FALSE,
-                         nContact.B,
-                         param.nContact.B = NA,
-                         timeDep.nContact.B = FALSE,
-                         diff.nContact.B = FALSE,
-                         hostCount.nContact.B = FALSE,
-                         pTrans.B,
-                         param.pTrans.B = NA,
-                         timeDep.pTrans.B = FALSE,
-                         diff.pTrans.B = FALSE,
-                         hostCount.pTrans.B = FALSE,
-                         structure.function.A = NULL,
-                         structure.function.B = NULL,
-                         # Simulation settings
-                         print.progress = TRUE,
-                         print.step = 10) {
+dualDiscrete <- function(length.sim,
+                         max.infected.A,
+                         max.infected.B,
+                         init.individuals.A,
+                         init.individuals.B,
+                         pExit.A, param.pExit.A, timeDep.pExit.A=FALSE,
+                         pExit.B, param.pExit.B, timeDep.pExit.B=FALSE,
+                         nContact.A, param.nContact.A, timeDep.nContact.A=FALSE,
+                         nContact.B, param.nContact.B, timeDep.nContact.B=FALSE,
+                         pTrans.A, param.pTrans.A, timeDep.pTrans.A=FALSE,
+                         pTrans.B, param.pTrans.B, timeDep.pTrans.B=FALSE,
+                         prefix.host.A = "A",
+                         prefix.host.B = "B",
+                         print.progress=TRUE,
+                         print.step=10,
+                         initial.population.A = 10000,
+                         initial.population.B = 10000,
+                         birth.rate.A = 0.5,
+                         birth.rate.B = 0.5,
+                         death.rate.A = 0.5,
+                         death.rate.B = 0.5) {
 
-  #### ---- Checks ---- ####
+  # Sanity check (you can extend this as needed)
+  if(length.sim <= 0) stop("length.sim must be positive")
+  if(init.individuals.A <= 0 || init.individuals.B <= 0) stop("initial individuals must be positive")
 
-  if (!(is.matrix(structure.matrix.A) & is.matrix(structure.matrix.B))) {
-    stop("Structure matrices must be of class 'matrix'")
-  }
-  if (!all(dim(structure.matrix.A) == dim(structure.matrix.B))) {
-    stop("Structure matrices for A and B must have the same dimensions")
-  }
-  if (!all(rownames(structure.matrix.A) == colnames(structure.matrix.A))) {
-    stop("Structure matrix A must have identical row and column names")
-  }
-  if (!all(rownames(structure.matrix.B) == colnames(structure.matrix.B))) {
-    stop("Structure matrix B must have identical row and column names")
-  }
-  if (!all(rownames(structure.matrix.A) == rownames(structure.matrix.B))) {
-    stop("Structure matrices A and B must have identical row names")
-  }
-  if (!all(rowSums(structure.matrix.A) == 1)) {
-    stop("Each row of structure.matrix.A must sum to 1")
-  }
-  if (!all(rowSums(structure.matrix.B) == 1)) {
-    stop("Each row of structure.matrix.B must sum to 1")
-  }
+  # Parse functions for population A
+  nContactParsed.A <- parseFunction(nContact.A, param.nContact.A, as.character(quote(nContact.A)), timeDep=timeDep.nContact.A)
+  pTransParsed.A <- parseFunction(pTrans.A, param.pTrans.A, as.character(quote(pTrans.A)), timeDep=timeDep.pTrans.A)
+  pExitParsed.A <- parseFunction(pExit.A, param.pExit.A, as.character(quote(pExit.A)), timeDep=timeDep.pExit.A)
 
-  #### ---- Initialization ---- ####
+  # Parse functions for population B
+  nContactParsed.B <- parseFunction(nContact.B, param.nContact.B, as.character(quote(nContact.B)), timeDep=timeDep.nContact.B)
+  pTransParsed.B <- parseFunction(pTrans.B, param.pTrans.B, as.character(quote(pTrans.B)), timeDep=timeDep.pTrans.B)
+  pExitParsed.B <- parseFunction(pExit.B, param.pExit.B, as.character(quote(pExit.B)), timeDep=timeDep.pExit.B)
 
-  # Number of discrete states
-  n_states <- nrow(structure.matrix.A)
-  states <- rownames(structure.matrix.A)
+  # ParamHost constructors for A and B
+  ParamHost.A <- paramConstructor(param.pExit.A, param.pMove=NA, param.nContact.A, param.pTrans.A, param.sdMove=NA)
+  ParamHost.B <- paramConstructor(param.pExit.B, param.pMove=NA, param.nContact.B, param.pTrans.B, param.sdMove=NA)
 
-  # Initialize population states per host type as named integer vectors
-  infected.A <- integer(n_states)
-  infected.B <- integer(n_states)
-  names(infected.A) <- states
-  names(infected.B) <- states
+  # Initialization message
+  message("Starting the simulation\nInitializing ...", appendLF = FALSE)
 
-  infected.individuals.A <- vector("list", length.sim)
-  infected.individuals.B <- vector("list", length.sim)
+  # Initialize simulation containers for A and B
+  res <- nosoiSimConstructor(total.time = 1,
+                             type = "dual",
+                             pop.A = nosoiSimOneConstructor(
+                               N.infected = init.individuals.A,
+                               table.hosts = iniTable(init.individuals.A, NA, prefix.host.A, ParamHost.A),
+                               table.state = NA,
+                               prefix.host = prefix.host.A,
+                               popStructure = "none"),
+                             pop.B = nosoiSimOneConstructor(
+                               N.infected = init.individuals.B,
+                               table.hosts = iniTable(init.individuals.B, NA, prefix.host.B, ParamHost.B),
+                               table.state = NA,
+                               prefix.host = prefix.host.B,
+                               popStructure = "none"))
 
-  infected.individuals.A[[1]] <- data.frame(
-    ID = seq_len(init.individuals.A),
-    infection.time = rep(1, init.individuals.A),
-    state = if (!is.na(init.structure.A)) rep(init.structure.A, init.individuals.A) else character(0),
-    exit.time = NA,
-    stringsAsFactors = FALSE
-  )
-  infected.individuals.B[[1]] <- data.frame(
-    ID = seq_len(init.individuals.B),
-    infection.time = rep(1, init.individuals.B),
-    state = if (!is.na(init.structure.B)) rep(init.structure.B, init.individuals.B) else character(0),
-    exit.time = NA,
-    stringsAsFactors = FALSE
-  )
+  # Initialize PopModel vectors for A and B
+  PopModel.A <- numeric(length.sim + 1)
+  PopModel.B <- numeric(length.sim + 1)
+  PopModel.A[1] <- initial.population.A
+  PopModel.B[1] <- initial.population.B
 
-  for (t in 2:length.sim) {
-    infected.individuals.A[[t]] <- data.frame(
-      ID = integer(0),
-      infection.time = integer(0),
-      state = character(0),
-      exit.time = numeric(0),
-      stringsAsFactors = FALSE
-    )
-    infected.individuals.B[[t]] <- data.frame(
-      ID = integer(0),
-      infection.time = integer(0),
-      state = character(0),
-      exit.time = numeric(0),
-      stringsAsFactors = FALSE
-    )
-  }
+  message("Starting the simulation\nInitializing ... running ...")
 
-  total.infected.A <- init.individuals.A
-  total.infected.B <- init.individuals.B
+  for (pres.time in 1:length.sim) {
 
-  continue.sim <- TRUE
-  time <- 1
+    # --- Population dynamics for A ---
+    births.A <- rpois(1, birth.rate.A * PopModel.A[pres.time])
+    deaths.A <- rbinom(1, PopModel.A[pres.time], death.rate.A)
 
-  #### ---- Progress messages like nosoi ---- ####
+    # Hosts exiting due to epidemic in A
+    exiting.A <- getExitingMoving(res$host.info.A, pres.time, pExitParsed.A)
+    if (!is.logical(exiting.A)) {
+      exiting.A <- seq_len(nrow(res$host.info.A$table.hosts)) %in% exiting.A
+    }
+    res$host.info.A$table.hosts[exiting.A, `:=` (out.time = pres.time, active = FALSE)]
+    epidemic_deaths.A <- sum(exiting.A)
 
-  if (print.progress) {
-    cat("Starting the simulation\n")
-    cat("Initializing ...\n")
-  }
+    # Update population size for A
+    PopModel.A[pres.time + 1] <- max(0, PopModel.A[pres.time] + births.A - deaths.A - epidemic_deaths.A)
 
-  if (print.progress) {
-    cat(" running ...\n")
-  }
+    # --- Population dynamics for B ---
+    births.B <- rpois(1, birth.rate.B * PopModel.B[pres.time])
+    deaths.B <- rbinom(1, PopModel.B[pres.time], death.rate.B)
 
-  #### ---- Simulation loop ---- ####
+    # Hosts exiting due to epidemic in B
+    exiting.B <- getExitingMoving(res$host.info.B, pres.time, pExitParsed.B)
+    if (!is.logical(exiting.B)) {
+      exiting.B <- seq_len(nrow(res$host.info.B$table.hosts)) %in% exiting.B
+    }
+    res$host.info.B$table.hosts[exiting.B, `:=` (out.time = pres.time, active = FALSE)]
+    epidemic_deaths.B <- sum(exiting.B)
 
-  while (continue.sim & time <= length.sim) {
+    # Update population size for B
+    PopModel.B[pres.time + 1] <- max(0, PopModel.B[pres.time] + births.B - deaths.B - epidemic_deaths.B)
 
-    if (print.progress && (time %% print.step == 0)) {
-      cat(".")
-      flush.console()
+    # Stop if no active hosts in either population
+    if (!any(res$host.info.A$table.hosts[["active"]]) && !any(res$host.info.B$table.hosts[["active"]])) {
+      message("No active hosts left in either population. Stopping simulation.")
+      break
     }
 
-    # --- SIMULATION LOGIC HERE ---
-    # (You need to fill this with your actual update logic for pExit, pMove, nContact, pTrans)
+    # --- Transmission step ---
+    # For population A (contacts and transmission)
+    df.meetTransmit.A <- meetTransmit(res$host.info.A, pres.time, positions = NULL, nContactParsed.A, pTransParsed.A)
+    res$host.info.A <- writeInfected(df.meetTransmit.A, res$host.info.A, pres.time, ParamHost.A)
 
-    # For now, just an example increment in time, replace with your actual code:
-    # Example: update infected individuals here
+    # For population B (contacts and transmission)
+    df.meetTransmit.B <- meetTransmit(res$host.info.B, pres.time, positions = NULL, nContactParsed.B, pTransParsed.B)
+    res$host.info.B <- writeInfected(df.meetTransmit.B, res$host.info.B, pres.time, ParamHost.B)
 
-    # Stopping condition example:
-    if (total.infected.A >= max.infected.A | total.infected.B >= max.infected.B) {
-      continue.sim <- FALSE
+    # Progress printing
+    if (print.progress && (pres.time %% print.step == 0)) {
+      progressMessage(Host.count.A = res$host.info.A$N.infected,
+                      Host.count.B = res$host.info.B$N.infected,
+                      pres.time = pres.time,
+                      print.step = print.step,
+                      length.sim = length.sim,
+                      max.infected.A = max.infected.A,
+                      max.infected.B = max.infected.B)
     }
 
-    time <- time + 1
+    # Stop if max infected exceeded in either population
+    if (res$host.info.A$N.infected > max.infected.A || res$host.info.B$N.infected > max.infected.B) {
+      message("Max infected exceeded in one population. Stopping simulation.")
+      break
+    }
   }
 
-  if (print.progress) {
-    cat("\n")
-    cat("done.\n")
-    cat(paste0("The simulation has run for ", time - 1,
-               " units of time and a total of ",
-               total.infected.A + total.infected.B,
-               " hosts have been infected.\n"))
-  }
-
-  #### ---- Return results ---- ####
-
-  return(list(
-    infected.individuals.A = infected.individuals.A,
-    infected.individuals.B = infected.individuals.B,
-    total.infected.A = total.infected.A,
-    total.infected.B = total.infected.B
+  # End message
+  message("done.")
+  message(sprintf(
+    "The simulation has run for %d units of time and a total of %d hosts have been infected.",
+    pres.time,
+    res$host.info.A$N.infected + res$host.info.B$N.infected
   ))
+
+  res$total.time <- pres.time
+  res$pop_model.A <- PopModel.A[1:(pres.time + 1)]
+  res$pop_model.B <- PopModel.B[1:(pres.time + 1)]
+
+  return(res)
 }
