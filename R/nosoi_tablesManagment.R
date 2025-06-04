@@ -41,7 +41,7 @@ newLine <- function(hosts.ID,
              inf.time = time.is,
              out.time = NA_integer_,
              active = TRUE,
-             as.list(sapply(ParamHost, function(x) x(1)))
+             as.list(sapply(ParamHost[c("pExit", "nContact", "pTrans")], function(f) f(1)))
     )
     )
   }
