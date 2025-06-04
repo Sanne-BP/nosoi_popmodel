@@ -283,6 +283,7 @@ nosoiSimConstructor <- function(total.time, type, pop.A, pop.B) {
        host.info.B = pop.B)
 }
 
+#THIS WORKSSSSS:
 result <- dualDiscrete(length.sim = 100,
                        max.infected.A = 10000,
                        max.infected.B = 10000,
@@ -316,5 +317,48 @@ result <- dualDiscrete(length.sim = 100,
 #> Initializing ... running ...
 #> done.
 #> The simulation has run for 34 units of time and a total of 106 (A) and 129 (B) hosts have been infected.
+
+
+
+
+
+
+
+
+
+
+
+#----------------------------------------------------------------------------------------------
+#SO NOW: lets make it more similar to the original default dualDiscrete version + make the simulation output similar as well!!
+
+nContact.A <- function(t) { abs(round(rnorm(1, 0.5, 1), 0)) }  # stochastic
+
+pTrans.A <- function(t, param) {
+  if (t <= param$t_incub) return(0)
+  else return(param$p_max)
+}
+param.pTrans.A <- list(p_max = 0.2, t_incub = 5)
+
+#my version also has no subpopulation structure, host movement between subpopulations and initital structure assignment.
+
+structure.matrix.A <- matrix(c(0, 0.2, 0.4, 0.5, 0, 0.6, 0.5, 0.8, 0),
+                             nrow = 3, ncol = 3,
+                             dimnames = list(c("A", "B", "C"), c("A", "B", "C")))
+
+pMove.A <- function(t) { return(0.1) }
+
+dt <- data.table(
+  id = paste0(prefix, seq_len(n)),
+  active = TRUE,
+  out.time = NA_integer_,
+  inf.time = 0,
+  structure = "A",  # for structured models
+  p_max = rbeta(n, 5, 2),  # example param
+  t_incub = rnorm(n, 5, 1)
+)
+
+
+
+
 
 

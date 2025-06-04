@@ -166,7 +166,9 @@ dualDiscrete <- function(length.sim,
 
   # Sanity check (you can extend this as needed)
   if(length.sim <= 0) stop("length.sim must be positive")
-  if(init.individuals.A <= 0 || init.individuals.B <= 0) stop("initial individuals must be positive")
+  if(init.individuals.A < 0 || init.individuals.B < 0) stop("initial individuals cannot be negative")
+  if(init.individuals.A == 0 && init.individuals.B == 0) stop("At least one initial infected individual must be specified")
+
 
   # Parse functions for population A
   nContactParsed.A <- parseFunction(nContact.A, param.nContact.A, as.character(quote(nContact.A)), timeDep=timeDep.nContact.A)
@@ -225,6 +227,7 @@ dualDiscrete <- function(length.sim,
 
     # Update population size for A
     PopModel.A[pres.time + 1] <- max(0, PopModel.A[pres.time] + births.A - deaths.A - epidemic_deaths.A)
+    PopModel.A[pres.time + 1] <- max(0, PopModel.A[pres.time + 1])
 
     # --- Population dynamics for B ---
     births.B <- rpois(1, birth.rate.B * PopModel.B[pres.time])
@@ -240,6 +243,7 @@ dualDiscrete <- function(length.sim,
 
     # Update population size for B
     PopModel.B[pres.time + 1] <- max(0, PopModel.B[pres.time] + births.B - deaths.B - epidemic_deaths.B)
+    PopModel.B[pres.time + 1] <- max(0, PopModel.B[pres.time + 1])
 
     # Stop if no active hosts in either population
     if (!any(res$host.info.A$table.hosts[["active"]]) && !any(res$host.info.B$table.hosts[["active"]])) {
