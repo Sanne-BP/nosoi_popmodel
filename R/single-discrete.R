@@ -75,60 +75,60 @@
 #'}
 #' @export singleDiscrete
 singleDiscrete <- function(length.sim,
-                           max.infected,
+                           max.infected = 10000,
+
+                           # Population A
                            init.individuals.A,
+                           pExit.A, param.pExit.A = NA,
+                           nContact.A, param.nContact.A = NA,
+                           pTrans.A, param.pTrans.A = NA,
+                           initial.population.A,
+                           birth.rate.A,
+                           death.rate.A,
+
+                           # Population B
                            init.individuals.B,
-                           pExit.A, param.pExit.A, timeDep.pExit.A=FALSE,
-                           pExit.B, param.pExit.B, timeDep.pExit.B=FALSE,
-                           nContact.A, param.nContact.A, timeDep.nContact.A=FALSE,
-                           nContact.B, param.nContact.B, timeDep.nContact.B=FALSE,
-                           pTrans.A, param.pTrans.A, timeDep.pTrans.A=FALSE,
-                           pTrans.B, param.pTrans.B, timeDep.pTrans.B=FALSE,
-                           prefix.host.A="A",
-                           prefix.host.B="B",
-                           print.progress=TRUE,
-                           print.step=10,
-                           initial.population.A=10000,
-                           birth.rate.A=0.5,
-                           death.rate.A=0.5,
-                           initial.population.B=1000,
-                           birth.rate.B=0.8,
-                           death.rate.B=0.6) {
+                           pExit.B, param.pExit.B = NA,
+                           nContact.B, param.nContact.B = NA,
+                           pTrans.B, param.pTrans.B = NA,
+                           initial.population.B,
+                           birth.rate.B,
+                           death.rate.B,
 
-  # Sanity check
-  CoreSanityChecksDiscrete(length.sim, max.infected, init.individuals.A, init.individuals.B)
+                           # Simulation settings
+                           print.progress = TRUE,
+                           print.step = 10) {
 
-  # Parse functions
-  nContactParsed.A <- parseFunction(nContact.A, param.nContact.A, as.character(quote(nContact.A)), timeDep.nContact.A)
-  nContactParsed.B <- parseFunction(nContact.B, param.nContact.B, as.character(quote(nContact.B)), timeDep.nContact.B)
+  # Prefixes
+  prefix.host.A <- "H"
+  prefix.host.B <- "A"
 
-  pTransParsed.A <- parseFunction(pTrans.A, param.pTrans.A, as.character(quote(pTrans.A)), timeDep.pTrans.A)
-  pTransParsed.B <- parseFunction(pTrans.B, param.pTrans.B, as.character(quote(pTrans.B)), timeDep.pTrans.B)
+  # Host Parameters
+  ParamHost.A <- list(pExit = pExit.A, param.pExit = param.pExit.A,
+                      nContact = nContact.A, param.nContact = param.nContact.A,
+                      pTrans = pTrans.A, param.pTrans = param.pTrans.A)
 
-  pExitParsed.A <- parseFunction(pExit.A, param.pExit.A, as.character(quote(pExit.A)), timeDep.pExit.A)
-  pExitParsed.B <- parseFunction(pExit.B, param.pExit.B, as.character(quote(pExit.B)), timeDep.pExit.B)
+  ParamHost.B <- list(pExit = pExit.B, param.pExit = param.pExit.B,
+                      nContact = nContact.B, param.nContact = param.nContact.B,
+                      pTrans = pTrans.B, param.pTrans = param.pTrans.B)
 
-  # Parameter parsing
-  ParamHost.A <- paramConstructor(param.pExit.A, NA, param.nContact.A, param.pTrans.A, NA)
-  ParamHost.B <- paramConstructor(param.pExit.B, NA, param.nContact.B, param.pTrans.B, NA)
-
-  # Initialization
-  message("Starting the simulation\nInitializing ...", appendLF = FALSE)
-
+  # Initialize simulation
   res <- nosoiSimConstructor(
     total.time = 1,
     type = "dual",
     pop.A = nosoiSimOneConstructor(N.infected = init.individuals.A,
                                    table.hosts = iniTable(init.individuals.A, NA, prefix.host.A, ParamHost.A),
-                                   table.state = NA,
+                                   table.state = NULL,
                                    prefix.host = prefix.host.A,
                                    popStructure = "discrete"),
     pop.B = nosoiSimOneConstructor(N.infected = init.individuals.B,
                                    table.hosts = iniTable(init.individuals.B, NA, prefix.host.B, ParamHost.B),
-                                   table.state = NA,
+                                   table.state = NULL,
                                    prefix.host = prefix.host.B,
-                                   popStructure = "discrete"))
+                                   popStructure = "discrete")
+  )
 
+  # ✅ Initialize custom population + infection tracking table AFTER constructor to avoid overwriting
   res$table.state <- data.table::data.table(
     time = integer(),
     population.A = numeric(),
@@ -137,122 +137,48 @@ singleDiscrete <- function(length.sim,
     infected.B = integer()
   )
 
-  # Explicitly mark as a data.table
-  data.table::setDT(res$table.state)
+  if (print.progress) cat("Starting the simulation\n")
 
-  print(str(res$table.state))
-
-  # Initialize population size vectors
-  PopModel.A <- numeric(length.sim + 1)
-  PopModel.B <- numeric(length.sim + 1)
-  PopModel.A[1] <- initial.population.A
-  PopModel.B[1] <- initial.population.B
-
-  stopifnot("table.state exists" = !is.null(res$table.state))
-  stopifnot("table.state is a data.table" = "data.table" %in% class(res$table.state))
-
-  message(" running ...")
-
-  for (pres.time in 1:length.sim) {
-    ### -- SUBPOPULATION A --
-    births.A <- rpois(1, birth.rate.A * PopModel.A[pres.time])
-    deaths.A <- rbinom(1, PopModel.A[pres.time], death.rate.A)
-
-    exiting.full.A <- getExitingMoving(res$host.info.A, pres.time, pExitParsed.A)
-    if (!is.logical(exiting.full.A)) {
-      exiting.full.A <- seq_len(nrow(res$host.info.A$table.hosts)) %in% exiting.full.A
-    }
-    res$host.info.A$table.hosts[exiting.full.A, `:=` (out.time = pres.time, active = FALSE)]
-    epidemic_deaths.A <- sum(exiting.full.A)
-
-    PopModel.A[pres.time + 1] <- max(0, PopModel.A[pres.time] + births.A - deaths.A - epidemic_deaths.A)
-
-    ### -- SUBPOPULATION B --
-    births.B <- rpois(1, birth.rate.B * PopModel.B[pres.time])
-    deaths.B <- rbinom(1, PopModel.B[pres.time], death.rate.B)
-
-    exiting.full.B <- getExitingMoving(res$host.info.B, pres.time, pExitParsed.B)
-    if (!is.logical(exiting.full.B)) {
-      exiting.full.B <- seq_len(nrow(res$host.info.B$table.hosts)) %in% exiting.full.B
-    }
-    res$host.info.B$table.hosts[exiting.full.B, `:=` (out.time = pres.time, active = FALSE)]
-    epidemic_deaths.B <- sum(exiting.full.B)
-
-    PopModel.B[pres.time + 1] <- max(0, PopModel.B[pres.time] + births.B - deaths.B - epidemic_deaths.B)
-
-    # Break if no active hosts
-    if (!any(res$host.info.A$table.hosts$active) && !any(res$host.info.B$table.hosts$active)) {
-      break
+  for (i in 1:length.sim) {
+    if (print.progress && i %% print.step == 0) {
+      cat("Time step:", i, "\n")
     }
 
-    # Step: Contact and transmission
-    df.meetTransmit.A <- meetTransmit(res$host.info.A, pres.time, positions = NULL, nContactParsed.A, pTransParsed.A)
-    df.meetTransmit.B <- meetTransmit(res$host.info.B, pres.time, positions = NULL, nContactParsed.B, pTransParsed.B)
+    # Update populations
+    births.A <- rpois(1, birth.rate.A * initial.population.A)
+    deaths.A <- rbinom(1, initial.population.A, death.rate.A)
+    initial.population.A <- initial.population.A + births.A - deaths.A
 
-    res$host.info.A <- writeInfected(df.meetTransmit.A, res$host.info.A, pres.time, ParamHost.A)
-    res$host.info.B <- writeInfected(df.meetTransmit.B, res$host.info.B, pres.time, ParamHost.B)
+    births.B <- rpois(1, birth.rate.B * initial.population.B)
+    deaths.B <- rbinom(1, initial.population.B, death.rate.B)
+    initial.population.B <- initial.population.B + births.B - deaths.B
 
+    # Run one simulation step
+    res <- dualStep(res, pop.A.params = ParamHost.A, pop.B.params = ParamHost.B)
 
-    # Construct temporary state table for this time step
+    # Track population sizes and infected counts
     table.state.temp <- data.table::data.table(
-      time = pres.time,
-      population.A = PopModel.A[pres.time + 1],
-      infected.A = sum(res$host.info.A$table.hosts$active),
-      population.B = PopModel.B[pres.time + 1],
-      infected.B = sum(res$host.info.B$table.hosts$active)
+      time = i,
+      population.A = initial.population.A,
+      infected.A = length(res$pop.A$table$host),
+      population.B = initial.population.B,
+      infected.B = length(res$pop.B$table$host)
     )
 
-    # SAFETY CHECK before appending
-    if (!data.table::is.data.table(res$table.state)) {
-      warning("res$table.state became invalid, reinitializing.")
-      res$table.state <- data.table::data.table(
-        time = integer(),
-        population.A = numeric(),
-        infected.A = integer(),
-        population.B = numeric(),
-        infected.B = integer()
-      )
-    }
-
-    # Append to full state table
-    cat("DEBUG: before appending\n")
-    print(class(res$table.state))
-    print(res$table.state)
-    print(class(table.state.temp))
-    print(table.state.temp)
-
-
+    # ✅ Append to tracking table
     res$table.state <- data.table::rbindlist(
       list(res$table.state, table.state.temp), use.names = TRUE, fill = TRUE
     )
 
-
-    # Progress update
-    if (print.progress && (pres.time %% print.step == 0)) {
-      progressMessage(
-        Host.count.A = res$host.info.A$N.infected,
-        Host.count.B = res$host.info.B$N.infected,
-        pres.time = pres.time,
-        print.step = print.step,
-        length.sim = length.sim,
-        max.infected.A = max.infected,
-        max.infected.B = max.infected
-      )
-    }
-
-    if ((res$host.info.A$N.infected + res$host.info.B$N.infected) > max.infected) {
+    # Stop if max infected is reached
+    total.infected <- length(res$pop.A$table$host) + length(res$pop.B$table$host)
+    if (total.infected >= max.infected) {
+      if (print.progress) {
+        cat("Max infected reached at time", i, "\n")
+      }
       break
     }
   }
-
-  # Finalize
-  endMessage(res$host.info.A$N.infected + res$host.info.B$N.infected, pres.time)
-
-  res$total.time <- pres.time
-  res$pop_model <- list(
-    A = PopModel.A[1:(pres.time + 1)],
-    B = PopModel.B[1:(pres.time + 1)]
-  )
 
   return(res)
 }
