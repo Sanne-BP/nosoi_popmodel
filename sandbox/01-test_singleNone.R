@@ -5,6 +5,8 @@
 devtools::load_all("/Users/sanne/Library/Mobile Documents/com~apple~CloudDocs/Master Ecology & Conservation/Master Project 1/nosoi_popmodel")
 library(ggplot2)
 
+#clear environment
+rm(list = ls())
 
 
 
