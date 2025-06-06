@@ -300,9 +300,9 @@ result <- dualDiscrete(length.sim = 100,
                        initial.population.A = 10000,
                        initial.population.B = 5000,
                        birth.rate.A = 0.5,
-                       birth.rate.B = 0.5,
-                       death.rate.A = 0.8,
-                       death.rate.B = 0.8)
+                       birth.rate.B = 0.3,
+                       death.rate.A = 0.5,
+                       death.rate.B = 0.3)
 
 #Starting the simulation
 #Initializing ...Starting the simulation
@@ -318,3 +318,229 @@ result <- dualDiscrete(length.sim = 100,
 #> The simulation has run for 34 units of time and a total of 106 (A) and 129 (B) hosts have been infected.
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#this was apparently a very dummy test version thanks chatgpt, you are wonderful
+#so lets fix this:
+# Dummy versions of internal nosoi helpers ---------------------
+
+# ParamHost constructor (light wrapper)
+paramConstructor <- function(param.pExit, param.pMove, param.nContact, param.pTrans, param.sdMove) {
+  list(pExit = param.pExit, pMove = param.pMove,
+       nContact = param.nContact, pTrans = param.pTrans,
+       sdMove = param.sdMove)
+}
+
+# Fake initial host table constructor
+iniTable <- function(n.infected, state, prefix.host, params) {
+  data.table::data.table(
+    host.ID = paste0(prefix.host, "_", seq_len(n.infected)),
+    inf.time = 0,
+    out.time = NA,
+    active = TRUE
+  )
+}
+
+# Minimal simulation constructor
+nosoiSimOneConstructor <- function(N.infected, table.hosts, table.state, prefix.host, popStructure) {
+  list(
+    N.infected = N.infected,
+    table.hosts = table.hosts,
+    table.state = table.state,
+    prefix.host = prefix.host,
+    popStructure = popStructure
+  )
+}
+
+nosoiSimConstructor <- function(total.time, type, pop.A, pop.B) {
+  list(
+    total.time = total.time,
+    type = type,
+    host.info.A = pop.A,
+    host.info.B = pop.B
+  )
+}
+
+# Parse function wrapper
+parseFunction <- function(fct, param, name, timeDep=FALSE) {
+  return(function(time) fct(time, param))  # wrap in closure
+}
+
+# Epidemic exit determination
+getExitingMoving <- function(host.info, time, pExit.fct) {
+  active.idx <- which(host.info$table.hosts$active)
+  prob.exit <- pExit.fct(time)
+  exit <- stats::rbinom(length(active.idx), 1, prob.exit) == 1
+  active.idx[exit]
+}
+
+# Contact and transmission
+meetTransmit <- function(host.info, time, positions, nContact.fct, pTrans.fct) {
+  active.idx <- which(host.info$table.hosts$active)
+  n.contacts <- nContact.fct(time)
+  new.infections <- stats::rbinom(length(active.idx), n.contacts, pTrans.fct(time))
+  data.frame(
+    host = host.info$table.hosts$host.ID[active.idx],
+    new.infections = new.infections
+  )
+}
+
+# Infect hosts
+writeInfected <- function(df.meet, host.info, time, paramHost) {
+  total.new <- sum(df.meet$new.infections)
+  if (total.new > 0) {
+    new.IDs <- paste0(host.info$prefix.host, "_", nrow(host.info$table.hosts) + seq_len(total.new))
+    new.entries <- data.table::data.table(
+      host.ID = new.IDs,
+      inf.time = time,
+      out.time = NA,
+      active = TRUE
+    )
+    host.info$table.hosts <- data.table::rbindlist(list(host.info$table.hosts, new.entries), use.names = TRUE)
+    host.info$N.infected <- host.info$N.infected + total.new
+  }
+  return(host.info)
+}
+
+# Progress bar
+progressMessage <- function(Host.count.A, Host.count.B, pres.time, print.step, length.sim, max.infected.A, max.infected.B) {
+  cat(sprintf("[Time %d] Infected A: %d | Infected B: %d\n", pres.time, Host.count.A, Host.count.B))
+}
+
+# Simple constant-probability function
+constant_prob <- function(time, param) param
+
+# Now run your simulation
+result <- dualDiscrete(
+  length.sim = 50,
+  max.infected.A = 5000,
+  max.infected.B = 5000,
+  init.individuals.A = 10,
+  init.individuals.B = 5,
+  pExit.A = constant_prob, param.pExit.A = 0.1,
+  pExit.B = constant_prob, param.pExit.B = 0.05,
+  nContact.A = constant_prob, param.nContact.A = 10,
+  nContact.B = constant_prob, param.nContact.B = 5,
+  pTrans.A = constant_prob, param.pTrans.A = 0.2,
+  pTrans.B = constant_prob, param.pTrans.B = 0.3,
+  prefix.host.A = "H",
+  prefix.host.B = "W",
+  initial.population.A = 10000,
+  initial.population.B = 3000,
+  birth.rate.A = 0.1,
+  birth.rate.B = 0.05,
+  death.rate.A = 0.05,
+  death.rate.B = 0.1,
+  print.progress = TRUE,
+  print.step = 10
+)
+#The simulation has run for 6 units of time and a total of 5861 (A) and 795 (B) hosts have been infected.
+
+#lets create some visualizations:
+result$total.time
+result$type
+result$host.info.A
+result$host.info.A$N.infected
+result$host.info.B$N.infected
+result$host.info.A$table.hosts
+
+summary(results)
+
+getCumulative_dual <- function(host.info) {
+  tab <- host.info$table.hosts
+  tab[, t := inf.time]
+  cumulative <- tab[, .N, by = t][order(t)]
+  cumulative[, Count := cumsum(N)]
+  return(data.frame(t = cumulative$t, Count = cumulative$Count))}
+
+cumulative.A <- getCumulative_dual(result$host.info.A)
+cumulative.B <- getCumulative_dual(result$host.info.B)
+
+cumulative.A$host <- "A"
+cumulative.B$host <- "B"
+
+cumulative.table <- rbind(cumulative.A, cumulative.B)
+
+ggplot(data = cumulative.table, aes(x = t, y = Count, color = host)) +
+  geom_line(size = 1) +
+  theme_minimal() +
+  labs(x = "Time (t)", y = "Cumulative count of infected hosts",
+       title = "Cumulative Infections Over Time")
+
+getDynamic_dual <- function(host.info) {
+  tab <- host.info$table.hosts
+  times <- 0:max(tab$inf.time, na.rm = TRUE)
+
+  dyn <- sapply(times, function(t) {
+    sum(tab$inf.time <= t & (is.na(tab$out.time) | tab$out.time > t))
+  })
+
+  return(data.frame(t = times, Active = dyn))
+}
+
+dynamic.A <- getDynamic_dual(result$host.info.A)
+dynamic.B <- getDynamic_dual(result$host.info.B)
+
+dynamic.A$host <- "A"
+dynamic.B$host <- "B"
+
+dynamics.table <- rbind(dynamic.A, dynamic.B)
+
+ggplot(data = dynamics.table, aes(x = t, y = Active, color = host)) +
+  geom_line(size = 1.2) +
+  theme_minimal() +
+  labs(x = "Time (t)", y = "Active infections",
+       title = "Active Infections Over Time")
+
+## Plot 1: Cumulative
+p1 <- ggplot(cumulative.table, aes(x = t, y = Count, color = host)) +
+  geom_line(size = 1) + theme_minimal() +
+  labs(title = "Cumulative Infections", y = "Total Infected", x = "Time")+
+  theme_minimal(base_size = 18)
+p1
+
+#Plot 2: Pop Model
+pop_df <- data.table(
+  time = 0:(length(result$pop_model.A) - 1),   # time 0 … last step
+  PopA = result$pop_model.A,
+  PopB = result$pop_model.B
+)
+
+pop_df_long <- melt(
+  pop_df,
+  id.vars   = "time",
+  measure.vars = c("PopA", "PopB"),
+  variable.name = "host",
+  value.name   = "population"
+)
+
+## ---- 2. Quick visualisation ----
+p2 <- ggplot(pop_df_long, aes(x = time, y = population, colour = host)) +
+  geom_line(size = 1) +
+  labs(title = "Population trajectories of hosts A and B",
+       x     = "Time",
+       y     = "Population size",
+       colour = "Host") +
+  theme_minimal(base_size = 18)
+p2
+
+library(patchwork)
+p1 + p2 + plot_layout(ncol = 1)
+ggsave("sandbox/plots/presentation/dualdiscrete.png", width = 10, height = 8, dpi = 300, color = "white")

@@ -217,10 +217,10 @@ dualDiscrete <- function(length.sim,
 
     # Hosts exiting due to epidemic in A
     exiting.A <- getExitingMoving(res$host.info.A, pres.time, pExitParsed.A)
-    if (!is.logical(exiting.A)) {
-      exiting.A <- seq_len(nrow(res$host.info.A$table.hosts)) %in% exiting.A
+    if (is.logical(exiting.A)) {
+      exiting.A <- which(exiting.A)
     }
-    res$host.info.A$table.hosts[exiting.A, `:=` (out.time = pres.time, active = FALSE)]
+    res$host.info.A$table.hosts[exiting.A, `:=`(out.time = pres.time, active = FALSE)]
     epidemic_deaths.A <- sum(exiting.A)
 
     # Update population size for A
@@ -232,10 +232,10 @@ dualDiscrete <- function(length.sim,
 
     # Hosts exiting due to epidemic in B
     exiting.B <- getExitingMoving(res$host.info.B, pres.time, pExitParsed.B)
-    if (!is.logical(exiting.B)) {
-      exiting.B <- seq_len(nrow(res$host.info.B$table.hosts)) %in% exiting.B
+    if (is.logical(exiting.B)) {
+      exiting.B <- which(exiting.B)
     }
-    res$host.info.B$table.hosts[exiting.B, `:=` (out.time = pres.time, active = FALSE)]
+    res$host.info.B$table.hosts[exiting.B, `:=`(out.time = pres.time, active = FALSE)]
     epidemic_deaths.B <- sum(exiting.B)
 
     # Update population size for B
@@ -277,9 +277,10 @@ dualDiscrete <- function(length.sim,
   # End message
   message("done.")
   message(sprintf(
-    "The simulation has run for %d units of time and a total of %d hosts have been infected.",
+    "The simulation has run for %d units of time and a total of %d (A) and %d (B) hosts have been infected.",
     pres.time,
-    res$host.info.A$N.infected + res$host.info.B$N.infected
+    res$host.info.A$N.infected,
+    res$host.info.B$N.infected
   ))
 
   res$total.time <- pres.time
