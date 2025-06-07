@@ -429,25 +429,25 @@ constant_prob <- function(time, param) param
 
 # Now run your simulation
 result <- dualDiscrete(
-  length.sim = 50,
-  max.infected.A = 5000,
-  max.infected.B = 5000,
+  length.sim = 100,
+  max.infected.A = 100000,
+  max.infected.B = 100000,
   init.individuals.A = 10,
   init.individuals.B = 5,
   pExit.A = constant_prob, param.pExit.A = 0.1,
   pExit.B = constant_prob, param.pExit.B = 0.05,
-  nContact.A = constant_prob, param.nContact.A = 10,
-  nContact.B = constant_prob, param.nContact.B = 5,
+  nContact.A = constant_prob, param.nContact.A = 5,
+  nContact.B = constant_prob, param.nContact.B = 3,
   pTrans.A = constant_prob, param.pTrans.A = 0.2,
   pTrans.B = constant_prob, param.pTrans.B = 0.3,
   prefix.host.A = "H",
   prefix.host.B = "W",
-  initial.population.A = 10000,
-  initial.population.B = 3000,
-  birth.rate.A = 0.1,
+  initial.population.A = 100000,
+  initial.population.B = 50000,
+  birth.rate.A = 0.3,
   birth.rate.B = 0.05,
-  death.rate.A = 0.05,
-  death.rate.B = 0.1,
+  death.rate.A = 0.3,
+  death.rate.B = 0.05,
   print.progress = TRUE,
   print.step = 10
 )
@@ -510,11 +510,16 @@ ggplot(data = dynamics.table, aes(x = t, y = Active, color = host)) +
        title = "Active Infections Over Time")
 
 ## Plot 1: Cumulative
-p1 <- ggplot(cumulative.table, aes(x = t, y = Count, color = host)) +
-  geom_line(size = 1) + theme_minimal() +
-  labs(title = "Cumulative Infections", y = "Total Infected", x = "Time")+
-  theme_minimal(base_size = 18)
-p1
+p3 <- ggplot(cumulative.table, aes(x = t, y = Count, color = host)) +
+  geom_line(size = 1) +
+  theme_minimal() +
+  scale_colour_manual(values = c("A" = "blue", "B" = "red"),
+                      labels = c("A" = "Population A", "B" = "Population B"))+
+  labs(title = "Cumulative Infections", y = "Total Infected", x = "Time",
+       colour = "Infected Individuals")+
+  theme_minimal(base_size = 18)+
+  theme(plot.title = element_text(face = "bold"))
+p3
 
 #Plot 2: Pop Model
 pop_df <- data.table(
@@ -532,15 +537,21 @@ pop_df_long <- melt(
 )
 
 ## ---- 2. Quick visualisation ----
-p2 <- ggplot(pop_df_long, aes(x = time, y = population, colour = host)) +
+p4 <- ggplot(pop_df_long, aes(x = time, y = population, colour = host)) +
   geom_line(size = 1) +
-  labs(title = "Population trajectories of hosts A and B",
+  scale_colour_manual(values = c("PopA" = "blue", "PopB" = "red"),
+                      labels = c("PopA" = "A", "PopB" = "B"))+
+  labs(title = "Population trajectories",
        x     = "Time",
        y     = "Population size",
-       colour = "Host") +
-  theme_minimal(base_size = 18)
-p2
+       colour = "Population") +
+  theme_minimal(base_size = 18)+
+  theme(plot.title = element_text(face = "bold"))
+p4
 
 library(patchwork)
-p1 + p2 + plot_layout(ncol = 1)
-ggsave("sandbox/plots/presentation/dualdiscrete.png", width = 10, height = 8, dpi = 300, color = "white")
+p4 + p3 + plot_layout(ncol = 1)
+ggsave("sandbox/plots/presentation/dualdiscrete2.png", width = 10, height = 6, dpi = 300, bg = "white")
+
+
+
