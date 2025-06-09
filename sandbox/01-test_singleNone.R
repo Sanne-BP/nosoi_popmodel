@@ -103,9 +103,15 @@ str(sim$host.info.A)
 infected_over_time <- sapply(0:sim$total.time, function(t) {
   sum(sim$host.info.A$table.hosts$inf.time <= t)})
 
+#lets also add the dynamics (active infected hosts at a given time step) to the same table!
+active_infections <- sapply(0:sim$total.time, function(t) {
+  sum(sim$host.info.A$table.hosts$inf.time <= t &
+        sim$host.info.A$table.hosts$active)})
+
 pop_df <- data.frame(time = 0:sim$total.time,
-  population_size = sim$pop_model[1:(sim$total.time + 1)],
-  infected = infected_over_time)
+                     population_size = sim$pop_model[1:(sim$total.time + 1)],
+                     infected = infected_over_time,
+                     active = active_infections)
 
 head(pop_df)
 
@@ -127,10 +133,12 @@ ggplot(pop_df, aes(x = time, y = infected)) +
 
 #in the same plot:
 ggplot(pop_df, aes(x = time)) +
-  geom_line(aes(y = population_size, color = "Population Size"), size = 1.2) +
-  geom_line(aes(y = infected, color = "Infected Individuals"), size = 1.2) +
-  scale_color_manual(values = c("Population Size" = "blue",
-                                "Infected Individuals" = "red")) +
+  geom_line(aes(y = active, color = "Active Infected Individuals"), size = 1) +
+  geom_line(aes(y = infected, color = "Cumulative Infected Individuals"), size = 1) +
+  geom_line(aes(y = population_size, color = "Population Size"), size = 1) +
+  scale_color_manual(values = c("Active Infected Individuals" = "darkgreen",
+                                "Cumulative Infected Individuals" = "red",
+                                "Population Size" = "blue")) +
   labs(title = "Population dynamics and Infected Individuals Over Time",
        x = "Time",
        y = "Number of Individuals",
@@ -141,8 +149,36 @@ ggplot(pop_df, aes(x = time)) +
         legend.text = element_text(size = 18),
         legend.title = element_text(size = 18))
 
+
+ggplot(pop_df, aes(x = time)) +
+  geom_line(aes(y = population_size, color = factor("Population Size",
+                                                    levels = c("Population Size",
+                                                               "Cumulative Infected Individuals",
+                                                               "Active Infected Individuals"))), size = 1) +
+  geom_line(aes(y = infected, color = factor("Cumulative Infected Individuals",
+                                             levels = c("Population Size",
+                                                        "Cumulative Infected Individuals",
+                                                        "Active Infected Individuals"))), size = 1) +
+  geom_line(aes(y = active, color = factor("Active Infected Individuals",
+                                           levels = c("Population Size",
+                                                      "Cumulative Infected Individuals",
+                                                      "Active Infected Individuals"))), size = 1) +
+  scale_color_manual(values = c("Population Size" = "blue",
+                                "Cumulative Infected Individuals" = "red",
+                                "Active Infected Individuals" = "darkgreen")) +
+  labs(title = "Population dynamics and Infected Individuals Over Time",
+       x = "Time",
+       y = "Number of Individuals",
+       color = "Legend") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 22, face = "bold"),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 18),
+        legend.title = element_text(size = 18))
+
+
 #ggsave("sandbox/plots/population_dynamics2.pdf", width = 10, height = 6)
-ggsave("sandbox/plots/presentation/PopModel_infected.png", width = 10, height = 6, dpi = 300, bg = "white")
+ggsave("sandbox/plots/presentation/PopModel_infected5.png", width = 10, height = 6, dpi = 300, bg = "white")
 
 #observation from plot: infected rises while population drops, which indicates that the outbreak is actually spreading fast enough that infection-related exits are reducing population size!!
 
@@ -157,18 +193,25 @@ ggsave("sandbox/plots/presentation/PopModel_infected.png", width = 10, height = 
 
 
 
+
+
+
+
+
+
+
 #Can we alter the parameters?------------------------------------------------------------
 #yes we can, these parameters are now more representing how the "old default" parameters are set
-p_Exit_fct <- function(t) {return(0.05)}
+p_Exit_fct <- function(t) {return(0.3)}
 
-n_contact_fct <- function(t) {abs(round(rnorm(1, mean = 10, sd = 1), 0))}
+n_contact_fct <- function(t) {abs(round(rnorm(1, mean = 5, sd = 1), 0))}
 
 p_Trans_fct <- function(t, p_max, t_incub) {
   if (t < t_incub) return(0)
   else return(p_max)}
 
-t_incub_fct <- function(x) {rnorm(x, mean = 3, sd = 1)}
-p_max_fct <- function(x) {rbeta(x, shape1 = 5, shape2 = 2)}
+t_incub_fct <- function(x) {rnorm(x, mean = 1, sd = 1)}
+p_max_fct <- function(x) {rbeta(x, shape1 = 2, shape2 = 2)}
 
 param_pTrans <- list(p_max = p_max_fct, t_incub = t_incub_fct)
 
