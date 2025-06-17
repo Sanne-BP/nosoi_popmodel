@@ -29,6 +29,11 @@
 #' @param hostCount.pTrans does pTrans varies with the host count in the state? (TRUE/FALSE); diff.pTrans should be TRUE.
 #' @param diff.pExit is pExit different between states of the structured population (TRUE/FALSE)
 #' @param hostCount.pExit does pExit varies with the host count in the state? (TRUE/FALSE); diff.pExit should be TRUE.
+#' @param initial.population.structure A named list of initial population sizes per location.
+#' @param birth.rate.structure A named list of birth rates per location.
+#' @param param.birth.rate.structure (Optional) Parameters passed to user-defined birth rate functions, if used.
+#' @param death.rate.structure A named list of death rates per location.
+#' @param param.death.rate.structure (Optional) Parameters passed to user-defined death rate functions, if used.
 #'
 #' @inherit singleNone return details
 #'
@@ -77,6 +82,14 @@ singleDiscrete <- function(length.sim,
                            init.individuals,
                            init.structure,
                            structure.matrix,
+
+                           #pop dynamics
+                           initial.population.structure,
+                           birth.rate.structure,
+                           param.birth.rate.structure,
+                           death.rate.structure,
+                           param.death.rate.structure,
+
                            diff.pExit=FALSE,
                            timeDep.pExit=FALSE,
                            hostCount.pExit=FALSE,
@@ -145,6 +158,13 @@ singleDiscrete <- function(length.sim,
                                prefix.host = prefix.host,
                                popStructure = "discrete"))
 
+  #inserting pop dynamics
+  PopModel <- list()
+  for (loc in names(initial.population.structure)) {
+    PopModel[[loc]] <- numeric(length.sim + 1)
+    PopModel[[loc]][1] <- initial.population.structure[[loc]]
+  }
+
   # Running the simulation ----------------------------------------
   message(" running ...")
 
@@ -157,6 +177,18 @@ singleDiscrete <- function(length.sim,
                                                     active = FALSE)]
 
     res$host.info.A <- updateTableState(res$host.info.A, exiting.full, pres.time)
+
+    #update per location
+    for (loc in names(PopModel)) {
+      births <- rpois(1, birth.rate.structure[[loc]] * PopModel[[loc]][pres.time])
+      deaths <- rbinom(1, PopModel[[loc]][pres.time], death.rate.structure[[loc]])
+
+      epidemic_deaths <- sum(res$host.info.A$table.hosts$structure == loc &
+                               !res$host.info.A$table.hosts$active &
+                               res$host.info.A$table.hosts$out.time == pres.time)
+
+      PopModel[[loc]][pres.time + 1] <- max(0, PopModel[[loc]][pres.time] + births - deaths - epidemic_deaths)
+    }
 
     if (!any(res$host.info.A$table.hosts[["active"]])) {break}
 
@@ -192,5 +224,7 @@ singleDiscrete <- function(length.sim,
   endMessage(Host.count.A = res$host.info.A$N.infected, pres.time = pres.time)
 
   res$total.time <- pres.time
+  res$pop_model <- lapply(PopModel, function(x) x[1:(pres.time + 1)])
+
   return(res)
 }
