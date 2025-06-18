@@ -127,6 +127,11 @@ singleDiscrete <- function(length.sim,
   if (!all(init.structure %in% rownames(structure.matrix))) {
     stop("Invalid entries in `init.structure` not found in rownames of structure.matrix")}
 
+  # Ensure init.structure has names
+  if (is.null(names(init.structure))) {
+    names(init.structure) <- paste0("host-", seq_along(init.structure))
+  }
+
   #Parsing nContact
   nContactParsed <- parseFunction(nContact, param.nContact, as.character(quote(nContact)),diff=diff.nContact, timeDep = timeDep.nContact, hostCount=hostCount.nContact, stateNames=colnames(structure.matrix))
 
