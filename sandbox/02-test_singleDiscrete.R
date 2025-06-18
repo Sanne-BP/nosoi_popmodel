@@ -206,6 +206,13 @@ iniTable <- function(init.individuals, init.structure, prefix.host, ParamHost,
 }
 
 
+#
+print("init.structure:")
+print(init.structure)
+print("names(init.structure):")
+print(names(init.structure))
+
+
 res <- singleDiscrete(length.sim = 100,
                       max.infected = 10000,
                       init.individuals = 10,
@@ -228,6 +235,86 @@ res <- singleDiscrete(length.sim = 100,
 
 
 
+#TEST
+test_structure <- rep("A", 2)
+names(test_structure) <- paste0("host-", 1:2)
 
+test_table <- iniTable(init.individuals = 2,
+                       init.structure = test_structure,
+                       prefix.host = "T",
+                       ParamHost = NULL)
+
+print(colnames(test_table))
+print(test_table)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#---------------------------------------------------------------------------------------------
+#apparently modifying newLine and IniTable outside the core does not work according to chatgpt, even tho it was said it actually could be done this way. soooooooo guess we are modifying the nosoi_tablesManagment script now :) yayyy
+
+#now we should be able to just run this:
+res <- singleDiscrete(length.sim = 100,
+                      max.infected = 10000,
+                      init.individuals = 10,
+                      init.structure = rep("A", 10),  # all start in A
+                      structure.matrix = structure.matrix,
+                      initial.population.structure = initial.population.structure,
+                      birth.rate.structure = birth.rate.structure,
+                      param.birth.rate.structure = NULL,  # or appropriate parameters if needed
+                      death.rate.structure = death.rate.structure,
+                      param.death.rate.structure = NULL,
+                      # other required params like pExit, pMove, pTrans, nContact, etc.
+                      pExit = pExit,
+                      param.pExit = list(),
+                      pMove = pMove,
+                      param.pMove = list(),
+                      nContact = nContact,
+                      param.nContact = list(),
+                      pTrans = pTrans,
+                      param.pTrans = list())
+
+
+newLine(
+  hosts.ID = "host_1",
+  infected.by = NA,
+  infected.in = "A",
+  time.is = 1,
+  ParamHost = NULL,
+  current.count.A = 10L,
+  current.count.B = 5L
+)
+
+list.init <- lapply(1:10, function(i) {
+  newLine(
+    hosts.ID = paste0("host_", i),
+    infected.by = NA,
+    infected.in = "A",
+    time.is = 1,
+    ParamHost = NULL,
+    current.count.A = 10L,
+    current.count.B = 0L
+  )
+})
+
+data.table::rbindlist(list.init, fill = TRUE)
 
 
