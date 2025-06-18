@@ -119,6 +119,14 @@ singleDiscrete <- function(length.sim,
 
   CoreSanityChecks(length.sim, max.infected, init.individuals)
 
+  # Validate init.structure length
+  if (length(init.structure) != init.individuals) {
+    stop("Length of `init.structure` must match `init.individuals`")}
+
+  # Validate init.structure values
+  if (!all(init.structure %in% rownames(structure.matrix))) {
+    stop("Invalid entries in `init.structure` not found in rownames of structure.matrix")}
+
   #Parsing nContact
   nContactParsed <- parseFunction(nContact, param.nContact, as.character(quote(nContact)),diff=diff.nContact, timeDep = timeDep.nContact, hostCount=hostCount.nContact, stateNames=colnames(structure.matrix))
 
