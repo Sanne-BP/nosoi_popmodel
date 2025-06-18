@@ -25,47 +25,43 @@ newLine <- function(hosts.ID,
                     infected.in,
                     time.is,
                     ParamHost,
-                    current.environmental.value = NULL,
-                    current.cell.number.raster = NULL,
-                    current.count.A = integer(0),
-                    current.count.B = integer(0)) {
+                    current.environmental.value = NA,
+                    current.cell.number.raster = NA,
+                    current.count.A = 0L,
+                    current.count.B = 0L) {
+
+  base_list <- list(
+    hosts.ID     = as.character(ifelse(length(hosts.ID) == 0, NA, hosts.ID)),
+    inf.by       = as.character(ifelse(length(infected.by) == 0, NA, infected.by)),
+    inf.time     = as.integer(time.is),
+    out.time     = NA_integer_,
+    active       = TRUE,
+    host.count.A = as.integer(current.count.A),
+    host.count.B = as.integer(current.count.B)
+  )
 
   if (length(infected.in) == 1) {
-    if (is.na(infected.in)) infected.in <- NULL
-    return(c(hosts.ID = hosts.ID,
-             inf.by = infected.by,
-             inf.in = infected.in,
-             current.in = infected.in,
-             host.count.A = as.integer(current.count.A),
-             host.count.B = as.integer(current.count.B),
-             inf.time = time.is,
-             out.time = NA_integer_,
-             active = TRUE,
-             as.list(sapply(ParamHost, function(x) x(1)))
-    )
-    )
+    base_list$inf.in     <- as.character(infected.in)
+    base_list$current.in <- as.character(infected.in)
   }
 
   if (length(infected.in) == 2) {
-
-    return(c(hosts.ID = hosts.ID,
-             inf.by = infected.by,
-             inf.in.x = infected.in[1],
-             inf.in.y = infected.in[2],
-             current.in.x = infected.in[1],
-             current.in.y = infected.in[2],
-             current.env.value = current.environmental.value,
-             current.cell.raster = current.cell.number.raster,
-             host.count.A = as.integer(current.count.A),
-             host.count.B = as.integer(current.count.B),
-             inf.time = time.is,
-             out.time = NA_integer_,
-             active = TRUE,
-             as.list(sapply(ParamHost, function(x) x(1)))
-    )
-    )
+    base_list$inf.in.x            <- as.character(infected.in[1])
+    base_list$inf.in.y            <- as.character(infected.in[2])
+    base_list$current.in.x        <- as.character(infected.in[1])
+    base_list$current.in.y        <- as.character(infected.in[2])
+    base_list$current.env.value   <- current.environmental.value
+    base_list$current.cell.raster <- current.cell.number.raster
   }
+
+  if (!is.null(ParamHost)) {
+    param.list <- as.list(sapply(ParamHost, function(f) f(1)))
+    base_list <- c(base_list, param.list)
+  }
+
+  return(base_list)
 }
+
 
 #' Generates initial table to start the simulation (internal function)
 #'
@@ -84,45 +80,45 @@ newLine <- function(hosts.ID,
 
 iniTable <- function(init.individuals, init.structure, prefix.host, ParamHost,
                      current.environmental.value = NULL, current.cell.number.raster = NULL,
-                     current.count.A = integer(0), current.count.B = integer(0)){
+                     current.count.A = integer(0), current.count.B = integer(0)) {
 
-  if (init.individuals >= 1){
-    list.init <- vector("list", init.individuals)
+  list.init <- vector("list", init.individuals)
 
+  if (init.individuals >= 1) {
     for (indiv in 1:init.individuals) {
-      list.init[[indiv]] <- newLine(hosts.ID = paste(prefix.host,indiv,sep="-"),
-                                    infected.by = paste(NA,indiv,sep="-"),
-                                    infected.in = init.structure,
-                                    time.is = 0L,
-                                    ParamHost = ParamHost,
-                                    current.environmental.value = current.environmental.value,
-                                    current.cell.number.raster = current.cell.number.raster,
-                                    current.count.A = current.count.A,
-                                    current.count.B = current.count.B)
+      list.init[[indiv]] <- newLine(
+        hosts.ID = paste(prefix.host, indiv, sep = "-"),
+        infected.by = paste(NA, indiv, sep = "-"),
+        infected.in = init.structure[indiv],
+        time.is = 0L,
+        ParamHost = ParamHost,
+        current.environmental.value = current.environmental.value,
+        current.cell.number.raster = current.cell.number.raster,
+        current.count.A = current.count.A,
+        current.count.B = current.count.B
+      )
     }
-    table.hosts <- data.table::rbindlist(list.init)
+    table.hosts <- data.table::rbindlist(list.init, fill = TRUE)
+  } else {
+    table.hosts <- data.table::rbindlist(list(
+      newLine(
+        hosts.ID = paste(prefix.host, 1, sep = "-"),
+        infected.by = paste(NA, 1, sep = "-"),
+        infected.in = init.structure[1],
+        time.is = 0L,
+        ParamHost = ParamHost,
+        current.environmental.value = current.environmental.value,
+        current.cell.number.raster = current.cell.number.raster,
+        current.count.A = current.count.A,
+        current.count.B = current.count.B
+      )
+    ), fill = TRUE)[0]  # return empty table with correct columns
   }
 
-  if (init.individuals == 0){
-    fake.init.individuals <- 1
-    list.init <- vector("list", fake.init.individuals)
-
-    for (indiv in 1:fake.init.individuals) {
-      list.init[[indiv]] <- newLine(hosts.ID = paste(prefix.host,indiv,sep="-"),
-                                    infected.by = paste(NA,indiv,sep="-"),
-                                    infected.in = init.structure,
-                                    time.is = 0L,
-                                    ParamHost = ParamHost,
-                                    current.environmental.value = current.environmental.value,
-                                    current.cell.number.raster = current.cell.number.raster,
-                                    current.count.A = current.count.A,
-                                    current.count.B = current.count.B)
-    }
-    table.hosts <- data.table::rbindlist(list.init)
-    table.hosts <- table.hosts[-1]
+  # Safely set key
+  if (!("hosts.ID" %in% names(table.hosts))) {
+    stop("Column 'hosts.ID' is missing in table.hosts")
   }
-
-
   data.table::setkey(table.hosts, "hosts.ID")
 
   return(table.hosts)
