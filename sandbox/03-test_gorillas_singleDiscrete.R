@@ -1,6 +1,7 @@
 #lets continue with from the 02-test_singleDiscrete but now implement it into the case study example with humans and isolated mountain gorillas!
 
 #use hostcount()!! make nContact dependent on hostcount(), similar in ebola continuous, make it dependent on pop size!!! its a bandaid!! to avoid stupid cases of 100 million infections
+#gonna to this in script 04-mountaingorillas_singleDiscrete
 
 subpop_names <- c("Humans", "Gorilla1", "Gorilla2")
 init_pop <- list(Humans = 10000, Gorilla1 = 200, Gorilla2 = 450)
