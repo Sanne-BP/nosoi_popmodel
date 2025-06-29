@@ -28,11 +28,27 @@ p_Move_fct <- function(t, current.in) {
   if (current.in == "Gorilla2") return(0.02)
 }
 
-#number of contacts per infected host
-n_contact_fct <- function(t) {
-  abs(round(rnorm(1, mean = 0.5, sd = 1), 0))
+#number of contacts per infected host, but making it dependent on the initial population sizes to prevent very high, unrealistic cases of infections
+init_pop # <- list(Humans = 10000, Gorilla1 = 200, Gorilla2 = 450) using this!!
+
+n_contact_fct <- function(t, current.in) {
+  pop_size <- init_pop[[current.in]]
+
+  #Define a base rate per subpopulation (can be modified)
+  base_rate <- switch(current.in,
+                      Humans = 5,
+                      Gorilla1 = 3,
+                      Gorilla2 = 2)
+
+  #Cap contact rate scaling (can be modified)
+  cap <- base_rate * 10
+
+  if (pop_size < cap) {
+    return(max(0, round(base_rate * (pop_size / cap))))  #scaled down
+  } else {
+    return(base_rate)  #full base rate
+  }
 }
-#use hostcount()!! make nContact dependent on hostcount(), similar in ebola continuous, make it dependent on pop size!!! its a bandaid!! to avoid stupid cases of 100 million infections
 
 # For transmission probability, define with incubation and max prob, per host:
 p_max_fct <- function(x) rbeta(x, shape1 = 5, shape2 = 2)
@@ -75,7 +91,7 @@ run_sim_and_popmodel <- function(length.sim = 300,
                   timeDep.pMove = FALSE,
                   diff.pMove = TRUE, #true activates subpop-specific pMove
                   nContact = nContact,
-                  param.nContact = NA,
+                  param.nContact = list(),
                   timeDep.nContact = FALSE,
                   diff.nContact = FALSE,
                   pTrans = pTrans,
