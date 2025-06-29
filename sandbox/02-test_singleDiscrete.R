@@ -118,9 +118,9 @@ for (t in 1:length.sim) {
 
 ###Made a wrapper function!!
 run_sim_and_popmodel <- function(length.sim = 300,
-                                 init.pop = list(A=1000, B=800, C=600),
-                                 birth.rate = list(A=0.3, B=0.5, C=0.1),
-                                 death.rate = list(A=0.3, B=0.5, C=0.1),
+                                 init.pop = list(A = 1000, B = 800, C = 600),
+                                 birth.rate = list(A = 0.05, B = 0.03, C = 0.04),
+                                 death.rate = list(A = 0.01, B = 0.015, C = 0.02),
                                  transition.matrix,
                                  pExit,
                                  pMove,
@@ -155,34 +155,33 @@ run_sim_and_popmodel <- function(length.sim = 300,
                   print.progress = FALSE,
                   print.step = 10)
 
+  # Get actual epidemic duration
+  sim_length <- sim$total.time
+
   # Initialize population tracking
   PopModel <- list()
   for (loc in names(init.pop)) {
-    PopModel[[loc]] <- numeric(length.sim + 1)
+    PopModel[[loc]] <- numeric(sim_length + 1)
     PopModel[[loc]][1] <- init.pop[[loc]]
   }
 
-  # Extract hosts data frame (all hosts info)
+  # Extract hosts data frame
   hosts_df <- sim$host.info.A$table.hosts
 
-  # Loop over time steps to update population sizes
-  for (t in 1:length.sim) {
+  # Update population size based on births, deaths, and epidemic exits
+  for (t in 1:sim_length) {
     for (loc in names(PopModel)) {
-      # Calculate births and deaths
       births <- rpois(1, birth.rate[[loc]] * PopModel[[loc]][t])
       deaths <- rbinom(1, PopModel[[loc]][t], death.rate[[loc]])
-
-      # Count epidemic deaths at time t and location loc:
-      # Hosts that became inactive at time t AND are from location loc
       epidemic_deaths <- sum(hosts_df$structure == loc & hosts_df$out.time == t & hosts_df$active == FALSE)
 
-      # Update population size for next time step
       PopModel[[loc]][t + 1] <- max(0, PopModel[[loc]][t] + births - deaths - epidemic_deaths)
     }
   }
 
   return(list(simulation = sim, population = PopModel))
 }
+
 
 # Define parameters and functions (as you already have them):
 transition.matrix <- matrix(c(0,0.2,0.4,
@@ -320,14 +319,12 @@ p2 <- ggplot(pop_dt, aes(x = time, y = population, color = location)) +
 library(patchwork)
 # Combine the two plots
 p2 + p1 + plot_layout(ncol = 1)
-
+ggsave("sandbox/plots_report/singleDiscrete_test.png", width = 10, height = 6, dpi = 300, bg = "white")
 
 
 #SOOO: what does this even tell us as we are now running it external from nosoi again
 #so we can tell whether infection levels rise and fall relative to the population pool in each subpopulation.
 #whether epidemic waves are impacting pop dynamics
-#how host availability might be limiting or amplifying tranm
-
-
+#how host availability might be limiting or amplifying transmission
 
 
