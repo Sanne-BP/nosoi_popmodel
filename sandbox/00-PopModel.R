@@ -1,14 +1,18 @@
 #This is the population size dynamics = PopModel that I have made. And this is sufficient for now and we will work with it to implement it into Nosoi!!! (see script 01). Now, focusing on the singleDiscrete instead of integrating it fully!!
 #nContact was made dependent on the population size, so the bigger the population the higher the number of contacts and the smaller the population the lower the number of contacts. All these parameters can be adjusted!!
 
+#Load libraries
 library(devtools)
 library(nosoi)
 library(ggplot2)
 library(dplyr)
 
-#PopModel:
+#Population Model:
+
+#Define number of time steps for the simulation:
 time_steps <- 1000
 
+#Population Model function:
 simulate_population <- function(time_steps, initial_population, birth_rate, death_rate) {
   population <- numeric(time_steps + 1)
   population[1] <- initial_population
@@ -22,16 +26,18 @@ simulate_population <- function(time_steps, initial_population, birth_rate, deat
   return(population)
 }
 
+#Run the simulation:
 pop_size <- simulate_population(time_steps, initial_population = 100000,
                                 birth_rate = 0.5, death_rate = 0.5)
 
+#Plot the results:
 ggplot(data=data.frame(Time=1:length(pop_size), Population=pop_size),
        aes(x=Time, y=Population)) +
   geom_line(color="blue", linewidth=0.5) +
   theme_minimal() +
   labs(x="Time Steps", y="Population Size", title="Population Size Dynamics")
 
-#Parameters (can be adjusted ofcourse!):
+#Parameters (can be adjusted):
 n_contact_fct <- function(t) {
   current_pop <- pop_size[min(t + 1, length(pop_size))]
   base_rate <- 10
