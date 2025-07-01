@@ -1,4 +1,4 @@
-#case study for the report! now finetuning everything to match human and mountain gorilla populations + making the final modifications to the script etc. making everything sub population dependent
+#case study for the report! now fine tuning everything to match human and mountain gorilla populations + making the final modifications to the script etc. making everything sub population dependent
 
 #defining different (sub)populations dynamics:
 subpop_names <- c("Humans", "Gorilla1", "Gorilla2")
@@ -64,7 +64,7 @@ param_pTrans <- list(p_max = p_max_fct, t_incub = t_incub_fct)
 
 
 #Now run the wrapper function:
-run_sim_and_popmodel <- function(length.sim = 300,
+run_sim_and_popmodel <- function(length.sim = 365,
                                  init.pop,
                                  birth.rate,
                                  death.rate,
@@ -128,7 +128,7 @@ run_sim_and_popmodel <- function(length.sim = 300,
 
 #results:
 result <- run_sim_and_popmodel(
-  length.sim = 300,
+  length.sim = 365,
   init.pop = init_pop,
   birth.rate = birth_rates,
   death.rate = death_rates,
