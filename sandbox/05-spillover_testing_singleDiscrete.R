@@ -9,7 +9,7 @@
 
 
 #------------------------------------------------------------------------------------------------
-#1ST SCENARIO: SPILLOVER PROBABILITY (HUMAN -> MOUNTAIN GORILLA)
+#SPILLOVER PROBABILITY (HUMAN -> MOUNTAIN GORILLA)
 
 #defining different (sub)populations dynamics:
 subpop_names <- c("Humans", "Gorilla1", "Gorilla2")
@@ -62,20 +62,16 @@ n_contact_fct <- function(t, current.in) {
 }
 
 # For transmission probability, define with incubation and max prob, per host:
-# For transmission probability, define with incubation and max prob, per host:
-p_max_fct <- function(x) rbeta(x, shape1 = 3, shape2 = 4)
-t_incub_fct <- function(x) rnorm(x, mean = 3, sd = 1)
+p_max_fct <- function(x) rbeta(x, shape1 = 5, shape2 = 2)
+t_incub_fct <- function(x) rnorm(x, mean = 5, sd = 1)
 
 proba <- function(t, p_max, t_incub) {
-  if (t <= t_incub) {
-    p <- 0  # no transmission during incubation
-  } else {
-    p <- p_max  # after incubation, constant transmission probability
-  }
+  if (t <= t_incub) p <- 0 else p <- p_max
   return(p)
 }
 
 param_pTrans <- list(p_max = p_max_fct, t_incub = t_incub_fct)
+
 
 
 
@@ -94,7 +90,7 @@ run_sim_and_popmodel <- function(length.sim = 365,
   #Run epidemic simulation with Nosoi
   sim <- nosoiSim(type = "single", popStructure = "discrete",
                   length.sim = length.sim,
-                  max.infected = 10000,
+                  max.infected = 1100,
                   init.individuals = 1,
                   init.structure = names(init.pop)[1], # Start in first subpop
                   structure.matrix = transition.matrix,
@@ -115,7 +111,7 @@ run_sim_and_popmodel <- function(length.sim = 365,
                   timeDep.pTrans = FALSE,
                   diff.pTrans = FALSE,
                   prefix.host = "H",
-                  print.progress = FALSE,
+                  print.progress = TRUE,
                   print.step = 10)
 
   # Initialize population size tracking list for each subpop
@@ -157,23 +153,214 @@ result <- run_sim_and_popmodel(
 )
 
 
+
+
+
+
+
+
 #creating a metadata frame for respiratory disease spillover from humans to mountain gorillas
+#focusing on generating 3 dataframes: fragmented, connected, restored so we can start testing within these datasets + also between!!
 
-create_spillover_metadata <- function(simulation, population, scenario_name) {
-  # Extract simulation metadata
-  sim_meta <- list(
-    scenario = scenario_name,
-    length_sim = length(population$Humans) - 1,
-    init_pop = sapply(population, function(x) x[1]),
-    final_pop = sapply(population, function(x) tail(x, 1)),
-    total_infections = sum(simulation$host.info.A$table.hosts$active == FALSE),
-    total_deaths = sum(simulation$host.info.A$table.hosts$out.time > 0)
-  )
+# Fragmented (low gorilla connectivity)
+transition_fragmented <- matrix(
+  c(0.98,  0.015, 0.005,
+    0.01, 0.985, 0.005,
+    0.005, 0.015, 0.98),
+  nrow = 3, byrow = TRUE,
+  dimnames = list(subpop_names, subpop_names))
 
-  return(sim_meta)
+# Connected (medium connectivity)
+transition_connected <- matrix(
+  c(0.95,  0.03, 0.02,
+    0.02,  0.95, 0.03,
+    0.01,  0.02, 0.97),
+  nrow = 3, byrow = TRUE,
+  dimnames = list(subpop_names, subpop_names))
+
+# Restored (high connectivity, corridor)
+transition_restored <- matrix(
+  c(0.90,  0.05, 0.05,
+    0.04,  0.90, 0.06,
+    0.03,  0.03, 0.94),
+  nrow = 3, byrow = TRUE,
+  dimnames = list(subpop_names, subpop_names))
+
+#define contact scenarios (e.g. low and high)
+gorilla_contact_rates <- list(
+  low = list(Humans = 6, Gorilla1 = 2, Gorilla2 = 1),
+  high = list(Humans = 6, Gorilla1 = 6, Gorilla2 = 4)
+)
+
+library(tidyr)
+library(dplyr)
+
+# Define scenarios:
+scenarios <- expand.grid(
+  connectivity = c("fragmented", "connected", "restored"),
+  gorilla_sociality = c("low", "high"),
+  stringsAsFactors = FALSE
+)
+
+
+#sim wrapper that takes these parameters:
+run_scenario_sim <- function(connectivity_scenario, gorilla_sociality, n_reps = 100) {
+
+  # Select transition matrix
+  transition_matrix <- switch(connectivity_scenario,
+                              fragmented = transition_fragmented,
+                              connected = transition_connected,
+                              restored = transition_restored)
+
+  # Set contact rates for this sociality scenario
+  contact_rates <- gorilla_contact_rates[[gorilla_sociality]]
+
+  # Override n_contact_fct to use these rates
+  n_contact_fct_scenario <- function(t, current.in) {
+    pop_size <- init_pop[[current.in]]
+    base_rate <- contact_rates[[current.in]]
+
+    threshold <- 30
+    if (pop_size < threshold) {
+      scaled <- round(base_rate * (pop_size / threshold), digits = 0)
+      return(max(1, scaled))
+    } else {
+      return(base_rate)
+    }
+  }
+
+  # Run n_reps simulations for this scenario
+  results_list <- vector("list", n_reps)
+  for (i in seq_len(n_reps)) {
+    results_list[[i]] <- run_sim_and_popmodel(
+      length.sim = 365,
+      init.pop = init_pop,
+      birth.rate = birth_rates,
+      death.rate = death_rates,
+      transition.matrix = transition_matrix,
+      pExit = p_Exit_fct,
+      pMove = p_Move_fct,
+      nContact = n_contact_fct_scenario,
+      pTrans = proba,
+      param.pTrans = param_pTrans
+    )
+  }
+
+  return(results_list)
 }
 
+# Run all scenarios and store results:
+all_results <- list()
+
+for (i in 1:nrow(scenarios)) {
+  cat("Running scenario", i, "of", nrow(scenarios), "\n")
+  sc <- scenarios[i, ]
+  all_results[[paste0(sc$connectivity, "_", sc$gorilla_sociality)]] <- run_scenario_sim(
+    connectivity_scenario = sc$connectivity,
+    gorilla_sociality = sc$gorilla_sociality,
+    n_reps = 100
+  )
+}
+
+#extract and compile metadata from all simulations
+extract_metadata <- function(sim_result, scenario_name) {
+  sim <- sim_result$simulation
+  pop <- sim_result$population
+
+  hosts_df <- sim$host.info.A$table.hosts
+
+  # Identify first infection time in gorilla subpopulations (Gorilla1 or Gorilla2)
+  gorilla_infections <- hosts_df[hosts_df$current.in %in% c("Gorilla1", "Gorilla2") & hosts_df$inf.time > 0, ]
+  first_spillover_time <- if (nrow(gorilla_infections) > 0) min(gorilla_infections$inf.time, na.rm = TRUE) else NA
+
+  # Total gorilla infections
+  total_gorilla_infections <- nrow(gorilla_infections)
+
+  # Outbreak duration: max exit time (last recovery or death) across all hosts
+  outbreak_duration <- max(hosts_df$out.time, na.rm = TRUE)
+
+  # Total infections across all subpopulations
+  total_infections <- nrow(hosts_df)
+
+  # Final population sizes at end of sim
+  final_pop_sizes <- sapply(pop, function(x) tail(x, 1))
+
+  # Create a metadata row
+  meta <- data.frame(
+    scenario = scenario_name,
+    first_spillover_time = first_spillover_time,
+    total_gorilla_infections = total_gorilla_infections,
+    outbreak_duration = outbreak_duration,
+    total_infections = total_infections,
+    final_pop_humans = final_pop_sizes["Humans"],
+    final_pop_gorilla1 = final_pop_sizes["Gorilla1"],
+    final_pop_gorilla2 = final_pop_sizes["Gorilla2"]
+  )
+
+  return(meta)
+}
+
+all_metadata <- lapply(names(all_results), function(scn_name) {
+  runs <- all_results[[scn_name]]
+
+  # Extract metadata for each replicate in this scenario
+  scenario_meta <- lapply(runs, function(simres) {
+    extract_metadata(simres, scn_name)
+  })
+
+  do.call(rbind, scenario_meta)
+}) %>% do.call(rbind, .)
+
+
+unique(simulation$host.info.A$table.hosts$structure)
+
+# Add scenario columns back (optional, split by underscore)
+all_metadata <- all_metadata %>%
+  mutate(
+    connectivity = sub("_.*", "", scenario),
+    gorilla_sociality = sub(".*_", "", scenario)
+  )
 
 
 
+
+#SUMMARIZE results by scenario factors:
+summary_stats <- all_metadata |>
+  group_by(connectivity, gorilla_sociality) |>
+  summarise(
+    mean_first_spillover_time = mean(first_spillover_time, na.rm = TRUE),
+    mean_total_gorilla_infections = mean(total_gorilla_infections),
+    mean_outbreak_duration = mean(outbreak_duration),
+    mean_total_infections = mean(total_infections),
+    mean_final_pop_humans = mean(final_pop_humans),
+    mean_final_pop_gorilla1 = mean(final_pop_gorilla1),
+    mean_final_pop_gorilla2 = mean(final_pop_gorilla2),
+    .groups = "drop"
+  )
+print(summary_stats)
+
+
+#VISUALIZE!
+library(ggplot2)
+library(viridis)
+
+ggplot(all_metadata, aes(x = connectivity, y = total_gorilla_infections,
+                         fill = gorilla_sociality)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Gorilla Infections in different landscape scenarios",
+       y = "Total Gorilla Infections",
+       x = "Connectivity Scenario") +
+  scale_fill_viridis_d(option = "viridis")
+
+ggsave("sandbox/plots_report/spillover_gorilla_infections_by_scenario.png",  width = 7, height = 4, units = "in", dpi = 300, bg = "white")
+
+#saving results to google sheets:
+library(googlesheets4)
+gs4_auth()
+gs4_auth(cache = FALSE, scopes = "https://www.googleapis.com/auth/spreadsheets")
+
+sheet_id <- "1hAgsYenb26aRnrWWE4NNZkdnZkFyU3PSU9pZaxYbKtk"
+sheet_write(all_metadata, ss = sheet_id, sheet = "FactSpillover_metadata")
+sheet_write(summary_stats, ss = sheet_id, sheet = "FactSpillover_summarystats")
 
