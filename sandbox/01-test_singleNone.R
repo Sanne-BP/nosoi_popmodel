@@ -132,53 +132,35 @@ ggplot(pop_df, aes(x = time, y = infected)) +
   theme_minimal()
 
 #in the same plot:
-ggplot(pop_df, aes(x = time)) +
-  geom_line(aes(y = active, color = "Active Infected Individuals"), size = 1) +
-  geom_line(aes(y = infected, color = "Cumulative Infected Individuals"), size = 1) +
-  geom_line(aes(y = population_size, color = "Population Size"), size = 1) +
-  scale_color_manual(values = c("Active Infected Individuals" = "darkgreen",
-                                "Cumulative Infected Individuals" = "red",
-                                "Population Size" = "blue")) +
-  labs(title = "Population dynamics and Infected Individuals Over Time",
+p4 <- ggplot(pop_df, aes(x = time)) +
+  geom_line(aes(y = population_size,
+                color = factor("Population Size",
+                               levels = c("Population Size",
+                                          "Cumulative Infected Individuals",
+                                          "Active Infected Individuals"))), size = 1) +
+  geom_line(aes(y = infected,
+                color = factor("Cumulative Infected Individuals",
+                               levels = c("Population Size",
+                                          "Cumulative Infected Individuals",
+                                          "Active Infected Individuals"))), size = 1) +
+  geom_line(aes(y = active,
+                color = factor("Active Infected Individuals",
+                               levels = c("Population Size",
+                                          "Cumulative Infected Individuals",
+                                          "Active Infected Individuals"))), size = 1) +
+  scale_colour_viridis_d()+
+  labs(
        x = "Time",
        y = "Number of Individuals",
-       color = "Legend") +
-  theme_minimal()+
-  theme(plot.title = element_text(size = 22, face = "bold"),
-                        axis.title = element_text(size = 18),
-        legend.text = element_text(size = 18),
-        legend.title = element_text(size = 18))
-
-
-ggplot(pop_df, aes(x = time)) +
-  geom_line(aes(y = population_size, color = factor("Population Size",
-                                                    levels = c("Population Size",
-                                                               "Cumulative Infected Individuals",
-                                                               "Active Infected Individuals"))), size = 1) +
-  geom_line(aes(y = infected, color = factor("Cumulative Infected Individuals",
-                                             levels = c("Population Size",
-                                                        "Cumulative Infected Individuals",
-                                                        "Active Infected Individuals"))), size = 1) +
-  geom_line(aes(y = active, color = factor("Active Infected Individuals",
-                                           levels = c("Population Size",
-                                                      "Cumulative Infected Individuals",
-                                                      "Active Infected Individuals"))), size = 1) +
-  scale_color_manual(values = c("Population Size" = "blue",
-                                "Cumulative Infected Individuals" = "red",
-                                "Active Infected Individuals" = "darkgreen")) +
-  labs(title = "Population dynamics and Infected Individuals Over Time",
-       x = "Time",
-       y = "Number of Individuals",
-       color = "Legend") +
+       color = NULL) +
   theme_minimal() +
-  theme(plot.title = element_text(size = 22, face = "bold"),
-        axis.title = element_text(size = 18),
-        legend.text = element_text(size = 18),
-        legend.title = element_text(size = 18))
-
+  theme(plot.title = element_text(size = 11, face = "bold"),
+        axis.title = element_text(size = 11),
+        legend.text = element_text(size = 11))
+p4
 
 #ggsave("sandbox/plots/population_dynamics2.pdf", width = 10, height = 6)
-ggsave("sandbox/plots/presentation/PopModel_infected5.png", width = 10, height = 6, dpi = 300, bg = "white")
+#ggsave("sandbox/plots/presentation/PopModel_infected5.png", width = 10, height = 6, dpi = 300, bg = "white")
 
 #observation from plot: infected rises while population drops, which indicates that the outbreak is actually spreading fast enough that infection-related exits are reducing population size!!
 
@@ -187,9 +169,14 @@ ggsave("sandbox/plots/presentation/PopModel_infected5.png", width = 10, height =
 
 
 
+library(patchwork)
+p1 + p2 + p3 + p4 +
+  plot_layout(ncol = 2, guides = "collect") +
+  plot_annotation(title = "Epidemic Exits influence Population size",
+                  theme = theme(plot.title = element_text(size = 11, face = "bold")),
+                  tag_levels = 'A') & theme(legend.position = "bottom")
 
-
-
+ggsave("sandbox/plots/report/epidemicexits_popmodel.png", width = 7, height = 5, units = "in", dpi = 300, bg = "white")
 
 
 
@@ -253,7 +240,7 @@ pop_df <- data.frame(time = 0:sim$total.time,
                      population_size = sim$pop_model[1:(sim$total.time + 1)],
                      infected = infected_over_time)
 
-ggplot(pop_df, aes(x = time)) +
+p3 <- ggplot(pop_df, aes(x = time)) +
   geom_line(aes(y = population_size, color = "Population Size"), size = 1) +
   geom_line(aes(y = infected, color = "Infected Individuals"), size = 1) +
   scale_color_manual(values = c("Population Size" = "blue",
@@ -267,6 +254,7 @@ ggplot(pop_df, aes(x = time)) +
         axis.title = element_text(size = 18),
         legend.text = element_text(size = 18),
         legend.title = element_text(size = 18))
+p3
 
 #ggsave("sandbox/plots/population_dynamics2.pdf", width = 10, height = 6)
 ggsave("sandbox/plots/presentation/PopModel_infected2.png", width = 10, height = 6, dpi = 300, bg = "white")
@@ -278,7 +266,7 @@ ggsave("sandbox/plots/presentation/PopModel_infected2.png", width = 10, height =
 
 
 #---------test with stochastic replicates:
-n_replicates <- 50
+n_replicates <- 100
 
 results <- replicate(n_replicates, {
   sim <- singleNone(length.sim = 100,
@@ -307,17 +295,28 @@ table(results == 1)  # Number of extinctions at first case
 
 results_df <- data.frame(max_infected = results)
 
-ggplot(results_df, aes(x = max_infected)) +
+pA <- ggplot(results_df, aes(x = max_infected)) +
   geom_histogram(bins = 20, color = "white") +
-  labs(title = "Distribution of Maximum Infected Individuals per Simulation",
-    subtitle = "Results from 50 stochastic simulation runs",
+  scale_color_viridis_d() +
+  labs(title = "Distribution of Maximum Infected Individuals across 100 Simulations",
     x = "Maximum Number of Infected Individuals",
     y = "Frequency") +
   theme_minimal()+
-  theme(plot.title = element_text(size = 22, face = "bold"),
-        axis.title = element_text(size = 18))
+  theme(plot.title = element_text(size = 11, face = "bold"),
+        axis.title = element_text(size = 11))
+pA
 
-ggsave("sandbox/plots/presentation/histogram_repeats.png", width = 10, height = 6, dpi = 300, bg = "white")
+pA <- pA + labs(title = NULL)
+pB <- pB + labs(title = NULL, subtitle = NULL)
+
+pA + pB +
+  plot_layout(ncol = 1) +
+  plot_annotation(title = "Distribution of Maximum Infected Individuals across 100 Simulations",
+                  theme = theme(plot.title = element_text(size = 11, face = "bold")),
+                  tag_levels = 'A')
+
+
+ggsave("sandbox/plots/report/histogram_repeatsAB2.png", width = 7, height = 5, units = "in", dpi = 300, bg = "white")
 
 
 
