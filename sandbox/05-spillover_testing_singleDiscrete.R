@@ -13,9 +13,9 @@
 
 #defining different (sub)populations dynamics:
 subpop_names <- c("Humans", "Gorilla1", "Gorilla2")
-init_pop <- list(Humans = 300000, Gorilla1 = 607, Gorilla2 = 456)
-birth_rates <- list(Humans = 0.00001, Gorilla1 = 0.00006, Gorilla2 = 0.00006)
-death_rates <- list(Humans = 0.00001, Gorilla1 = 0.00006, Gorilla2 = 0.00006)
+init_pop <- list(Humans = 500000, Gorilla1 = 604, Gorilla2 = 459)
+birth_rates <- list(Humans = 0.0096, Gorilla1 = 0.013, Gorilla2 = 0.013)
+death_rates <- list(Humans = 0.0096, Gorilla1 = 0.013, Gorilla2 = 0.013)
 
 #movement matrix
 transition.matrix <- matrix(
@@ -28,15 +28,15 @@ transition.matrix <- matrix(
 #parameters:
 #exit rate per (sub)population
 p_Exit_fct <- function(t, current.in) {
-  if (current.in == "Humans") return(0.14)
-  if (current.in == "Gorilla1") return(0.10)
-  if (current.in == "Gorilla2") return(0.12)}
+  if (current.in == "Humans") return(0.000038)
+  if (current.in == "Gorilla1") return(0.2)
+  if (current.in == "Gorilla2") return(0.1)}
 
 #movement probability per (sub)population
 p_Move_fct <- function(t, current.in) {
-  if (current.in == "Humans") return(0.12) # mainly movement rangers, tourists, local forest use
-  if (current.in == "Gorilla1") return(0.03) # larger range, overlap with human edges
-  if (current.in == "Gorilla2") return(0.01) # min movement, more intact core forest
+  if (current.in == "Humans") return(0.2) # mainly movement rangers, tourists, local forest use
+  if (current.in == "Gorilla1") return(0.04) # larger range, overlap with human edges
+  if (current.in == "Gorilla2") return(0.02) # min movement, more intact core forest
 }
 
 #number of contacts per infected host, but making it dependent on the initial population sizes to prevent very high, unrealistic cases of infections
@@ -47,9 +47,9 @@ n_contact_fct <- function(t, current.in) {
 
   #Define a base rate per subpopulation (can be modified)
   base_rate <- switch(current.in,
-                      Humans = 6,    # Rangers, tourists, other locals
-                      Gorilla1 = 4,  # VM gorilla group (larger, more habituated)
-                      Gorilla2 = 2)  # Bwindi group (smaller, more isolated)
+                      Humans = 10,    # Rangers, tourists, other locals
+                      Gorilla1 = 6,  # VM gorilla group (larger, more habituated)
+                      Gorilla2 = 4)  # Bwindi group (smaller, more isolated)
 
   # Cap contacts at base rate if population size sufficient
   threshold <- 30  # Minimum population for full contact saturation
@@ -62,8 +62,8 @@ n_contact_fct <- function(t, current.in) {
 }
 
 # For transmission probability, define with incubation and max prob, per host:
-p_max_fct <- function(x) rbeta(x, shape1 = 5, shape2 = 2)
-t_incub_fct <- function(x) rnorm(x, mean = 5, sd = 1)
+p_max_fct <- function(x) rbeta(x, shape1 = 1.28, shape2 = 2)
+t_incub_fct <- function(x) rnorm(x, mean = 2.5, sd = 1.5)
 
 proba <- function(t, p_max, t_incub) {
   if (t <= t_incub) p <- 0 else p <- p_max
@@ -188,8 +188,8 @@ transition_restored <- matrix(
 
 #define contact scenarios (e.g. low and high)
 gorilla_contact_rates <- list(
-  low = list(Humans = 6, Gorilla1 = 2, Gorilla2 = 1),
-  high = list(Humans = 6, Gorilla1 = 6, Gorilla2 = 4)
+  low = list(Humans = 10, Gorilla1 = 2, Gorilla2 = 1),
+  high = list(Humans = 10, Gorilla1 = 6, Gorilla2 = 4)
 )
 
 library(tidyr)
@@ -344,23 +344,277 @@ print(summary_stats)
 library(ggplot2)
 library(viridis)
 
-ggplot(all_metadata, aes(x = connectivity, y = total_gorilla_infections,
-                         fill = gorilla_sociality)) +
-  geom_boxplot() +
-  theme_minimal() +
-  labs(title = "Gorilla Infections in different landscape scenarios",
-       y = "Total Gorilla Infections",
-       x = "Connectivity Scenario") +
+
+#making a stacked bar plot to show which epidemic simulations worked:
+all_metadata$status <- ifelse(all_metadata$total_gorilla_infections > 0, "success", "fail")
+
+all_metadata$connectivity <- factor(all_metadata$connectivity, levels = c("fragmented", "connected", "restored"))
+all_metadata$status <- factor(all_metadata$status, levels = c("fail", "success"))  # fail first (lightest on right)
+
+# Prepare data: count and percentage
+plot_data <- all_metadata %>%
+  group_by(connectivity, status) %>%
+  summarise(n = n()) %>%
+  mutate(percent = 100 * n / sum(n)) %>%
+  ungroup()
+
+# Plot
+ggplot(plot_data, aes(x = connectivity, y = percent, fill = status)) +
+  geom_bar(stat = "identity", position = "stack") +
+  coord_flip() +  # horizontal bars
+  scale_fill_manual(
+    values = c("fail" = "#f0f0f0", "success" = "#636363"),
+    labels = c("No Spillover", "Spillover")
+  ) +
+  labs(
+    x = "Connectivity",
+    y = "Percentage of Simulations",
+    fill = "Simulation Result"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+
+ggsave("sandbox/plots_report/succesfulsimulations.png",  width = 7, height = 4, units = "in", dpi = 300, bg = "white")
+
+
+
+#now plotting the boxplot with successes only!
+successful_runs <- all_metadata %>%
+  filter(total_gorilla_infections > 0)
+
+# Optional: set consistent factor order
+successful_runs$connectivity <- factor(successful_runs$connectivity, levels = c("fragmented", "connected", "restored"))
+
+# Boxplot
+ggplot(successful_runs, aes(x = connectivity, y = total_gorilla_infections,
+                            fill = gorilla_sociality)) +
+  geom_boxplot(alpha=0.6) +
+  theme_minimal(base_size = 11) +
+  labs(
+    title = "Gorilla Infections in Different Landscape Scenarios",
+    y = "Total Infections",
+    x = "Connectivity Scenario (n = 200 runs)",
+    fill = "Sociality"
+  ) +
   scale_fill_viridis_d(option = "viridis")
 
-ggsave("sandbox/plots_report/spillover_gorilla_infections_by_scenario.png",  width = 7, height = 4, units = "in", dpi = 300, bg = "white")
+ggsave("sandbox/plots_report/spillover_gorilla_infections_by_scenario2.png",  width = 7, height = 4, units = "in", dpi = 300, bg = "white")
 
-#saving results to google sheets:
-library(googlesheets4)
-gs4_auth()
-gs4_auth(cache = FALSE, scopes = "https://www.googleapis.com/auth/spreadsheets")
 
-sheet_id <- "1hAgsYenb26aRnrWWE4NNZkdnZkFyU3PSU9pZaxYbKtk"
-sheet_write(all_metadata, ss = sheet_id, sheet = "FactSpillover_metadata")
-sheet_write(summary_stats, ss = sheet_id, sheet = "FactSpillover_summarystats")
+
+
+
+
+
+
+
+
+
+
+
+
+
+#What is the spillover time, so when disease spills over from humans to MG?
+ggplot(successful_runs, aes(x = connectivity, y = first_spillover_time,
+                            fill = gorilla_sociality)) +
+  geom_boxplot(alpha = 0.6) +
+  theme_minimal(base_size = 11) +
+  labs(
+    title = "Spillover Timing Across Connectivity Scenarios",
+    y = "Time of First Spillover (days)",
+    x = "Connectivity Scenario",
+    fill = "Gorilla Sociality"
+  ) +
+  scale_fill_viridis_d(option = "viridis")
+
+ggsave("sandbox/plots_report/spillovertiming.png",  width = 7, height = 4, units = "in", dpi = 300, bg = "white")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#Also interested whether and if disease spreads from MG 1 to MG 2 and vice versa:
+sim_result <- all_results[[1]][[1]]
+
+extract_metadata <- function(sim_result, scenario_name) {
+  sim <- sim_result$simulation
+  pop <- sim_result$population
+
+  hosts_df <- sim$host.info.A$table.hosts
+
+  # Add infector population info by joining on inf.source.id
+  hosts_df <- hosts_df %>%
+    left_join(
+      hosts_df %>%
+        select(hosts.ID, current.in) %>%
+        rename(inf.by = hosts.ID, inf.source.pop = current.in),
+      by = "inf.by"
+    )
+
+  # First spillover to *any* gorilla
+  gorilla_infections <- hosts_df[hosts_df$current.in %in% c("Gorilla1", "Gorilla2") & hosts_df$inf.time > 0, ]
+  first_spillover_time <- if (nrow(gorilla_infections) > 0) min(gorilla_infections$inf.time, na.rm = TRUE) else NA
+
+  # Spillover from Gorilla1 → Gorilla2
+  mg1_to_mg2 <- hosts_df[
+    hosts_df$inf.by %in% hosts_df$hosts.ID[hosts_df$inf.in == "Gorilla1"] &
+      hosts_df$inf.in == "Gorilla2", ]
+
+  mg2_to_mg1 <- hosts_df[
+    hosts_df$inf.by %in% hosts_df$hosts.ID[hosts_df$inf.in == "Gorilla2"] &
+      hosts_df$inf.in == "Gorilla1", ]
+
+  spillover_MG1_to_MG2_time <- if (nrow(mg1_to_mg2) > 0) {
+    min(mg1_to_mg2$inf.time, na.rm = TRUE)
+  } else {
+    NA
+  }
+
+  spillover_MG2_to_MG1_time <- if (nrow(mg2_to_mg1) > 0) {
+    min(mg2_to_mg1$inf.time, na.rm = TRUE)
+  } else {
+    NA
+  }
+
+  # Total gorilla infections
+  total_gorilla_infections <- nrow(gorilla_infections)
+
+  # Outbreak duration: max exit time
+  outbreak_duration <- max(hosts_df$out.time, na.rm = TRUE)
+
+  # Total infections
+  total_infections <- nrow(hosts_df)
+
+  # Final population sizes
+  final_pop_sizes <- sapply(pop, function(x) tail(x, 1))
+
+  # Metadata row
+  meta <- data.frame(
+    scenario = scenario_name,
+    first_spillover_time = first_spillover_time,
+    total_gorilla_infections = total_gorilla_infections,
+    outbreak_duration = outbreak_duration,
+    total_infections = total_infections,
+    final_pop_humans = final_pop_sizes["Humans"],
+    final_pop_gorilla1 = final_pop_sizes["Gorilla1"],
+    final_pop_gorilla2 = final_pop_sizes["Gorilla2"],
+    spillover_MG1_to_MG2_time = spillover_MG1_to_MG2_time
+  )
+
+  return(meta)
+}
+
+all_metadata <- lapply(names(all_results), function(scn_name) {
+  runs <- all_results[[scn_name]]
+
+  scenario_meta <- lapply(runs, function(simres) {
+    extract_metadata(simres, scn_name)
+  })
+
+  do.call(rbind, scenario_meta)
+}) %>% do.call(rbind, .)
+
+# Add scenario columns
+all_metadata <- all_metadata %>%
+  mutate(
+    connectivity = sub("_.*", "", scenario),
+    gorilla_sociality = sub(".*_", "", scenario)
+  )
+
+
+hosts_df <- hosts_df %>%
+  left_join(
+    hosts_df %>%
+      select(hosts.ID, current.in) %>%
+      rename(inf.by = hosts.ID, inf.source.pop = current.in),
+    by = "inf.by"
+  )
+
+
+
+p1 <- ggplot(all_metadata, aes(x = connectivity, y = spillover_MG1_to_MG2_time,
+                         fill = gorilla_sociality)) +
+  geom_boxplot(alpha = 0.6) +
+  theme_minimal(base_size = 11) +
+  labs(
+    title = "Time of Gorilla1 → Gorilla2 Spillover by Connectivity and Sociality",
+    x = "Connectivity Scenario (n = 200 runs)",
+    y = "Time of First Spillover",
+    fill = "Gorilla Sociality") +
+  scale_x_discrete(limits = c("fragmented", "connected", "restored"))+
+  scale_fill_viridis_d(option = "viridis")
+
+
+
+
+
+
+
+#show percentage of simulations with spillover from MG1 to MG2:
+all_metadata$spillover_MG1_to_MG2_status <- ifelse(
+  !is.na(all_metadata$spillover_MG1_to_MG2_time),
+  "success",
+  "fail"
+)
+
+# Make sure factors have the right order
+all_metadata$connectivity <- factor(all_metadata$connectivity, levels = c("fragmented", "connected", "restored"))
+all_metadata$gorilla_sociality <- factor(all_metadata$gorilla_sociality)  # or specify levels if needed
+all_metadata$spillover_MG1_to_MG2_status <- factor(all_metadata$spillover_MG1_to_MG2_status, levels = c("fail", "success"))
+
+spillover_summary <- all_metadata %>%
+  group_by(connectivity, gorilla_sociality, spillover_MG1_to_MG2_status) %>%
+  summarise(count = n()) %>%
+  group_by(connectivity, gorilla_sociality) %>%
+  mutate(percent = 100 * count / sum(count)) %>%
+  ungroup()
+
+p2 <- ggplot(spillover_summary, aes(x = connectivity, y = percent,
+                              fill = spillover_MG1_to_MG2_status)) +
+  geom_bar(stat = "identity", position = "stack") +
+  coord_flip() +  # horizontal bars
+  scale_fill_manual(
+    values = c("fail" = "#f0f0f0", "success" = "#636363"),
+    labels = c("No Spillover", "Spillover")) +
+  labs(x = "Connectivity",
+    y = "Percentage of Simulations",
+    fill = "Simulation Result",
+    title = "Percentage of Simulations with MG1 to MG2 Spillover by Connectivity and Sociality") +
+  theme_minimal(base_size = 11) +
+  theme(panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank())
+
+
+ggsave("sandbox/plots_report/succesfulsimulations_part2.png",  width = 7, height = 4, units = "in", dpi = 300, bg = "white")
+
+
+library(patchwork)
+p1 <- p1 + labs(title = NULL)
+p2 <- p2 + labs(title = NULL)
+
+p1 + p2 +
+  plot_layout(ncol = 1) +
+  plot_annotation(tag_levels = 'A')
+
+ggsave("sandbox/plots_report/spillover_MG1_to_MG2.png",  width = 7, height = 6, units = "in", dpi = 300, bg = "white")
 
