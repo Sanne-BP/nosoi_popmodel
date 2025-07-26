@@ -1,4 +1,4 @@
-#This is the population size dynamics = PopModel that I have made. And this is sufficient for now and we will work with it to implement it into Nosoi!!! (see script 01). Now, focusing on the singleDiscrete instead of integrating it fully!!
+#This is the population size dynamics = PopModel that I have developed And this is sufficient for now and we will work with it to implement it into Nosoi!!! (see script 01). Now, focusing on the singleDiscrete instead of integrating it fully!!
 #nContact was made dependent on the population size, so the bigger the population the higher the number of contacts and the smaller the population the lower the number of contacts. All these parameters can be adjusted!!
 
 #Load libraries
